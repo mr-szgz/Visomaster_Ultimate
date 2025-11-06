@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 import uuid
+import copy
 from functools import partial
 from typing import TYPE_CHECKING, Dict
 
@@ -13,16 +14,20 @@ from app.ui.widgets.actions import list_view_actions
 from app.ui.widgets.actions import video_control_actions
 from app.ui.widgets.actions import layout_actions
 from app.ui.widgets import ui_workers
+from app.helpers.typing_helper import ParametersTypes, MarkerTypes
 import app.helpers.miscellaneous as misc_helpers
 
 if TYPE_CHECKING:
     from app.ui.main_ui import MainWindow
 
 def open_embeddings_from_file(main_window: 'MainWindow'):
-    embedding_filename, _ = QtWidgets.QFileDialog.getOpenFileName(main_window, filter='JSON (*.json)')
+    
+    embedding_filename, _ = QtWidgets.QFileDialog.getOpenFileName(main_window, filter='JSON (*.json)', dir=misc_helpers.get_dir_of_file(main_window.loaded_embedding_filename))
     if embedding_filename:
         with open(embedding_filename, 'r') as embed_file: #pylint: disable=unspecified-encoding
             embeddings_list = json.load(embed_file)
+            
+            # Use the robust clear function
             card_actions.clear_merged_embeddings(main_window)
 
             # Reset per ogni target face
@@ -44,6 +49,13 @@ def open_embeddings_from_file(main_window: 'MainWindow'):
                     embedding_store,  # Passa l'intero embedding_store
                     embedding_id=str(uuid.uuid1().int)
                 )
+
+        # After loading, this new order is the "unsorted" ground truth.
+        main_window.unsorted_embedding_ids = list(main_window.merged_embeddings.keys())
+        
+        # Now, apply the current sort mode to the newly loaded data.
+        if main_window.embedding_sort_mode != "Off":
+            reorder_embeddings_from_data(main_window, main_window.embedding_sort_mode)
 
     main_window.loaded_embedding_filename = embedding_filename or main_window.loaded_embedding_filename
 
@@ -77,10 +89,65 @@ def save_embeddings_to_file(main_window: 'MainWindow', save_as=False):
 
         main_window.loaded_embedding_filename = embedding_filename
 
+def reorder_embeddings_from_data(main_window: 'MainWindow', sort_mode: str):
+    """
+    Reorders embeddings by clearing and re-populating the list from a sorted
+    list of the data widgets. This is the safe, data-driven approach.
+    """
+    if not main_window.merged_embeddings:
+        return
+
+    # 1. Get the list of all button widgets from the master dictionary.
+    all_buttons = list(main_window.merged_embeddings.values())
+    ordered_buttons = []
+
+    # 2. Sort this list of widgets based on the desired mode.
+    if sort_mode == "Off":
+        if hasattr(main_window, 'unsorted_embedding_ids') and main_window.unsorted_embedding_ids:
+            # Create a map for quick lookup and then build the sorted list
+            id_to_button_map = {btn.embedding_id: btn for btn in all_buttons}
+            ordered_buttons = [id_to_button_map[embed_id] for embed_id in main_window.unsorted_embedding_ids if embed_id in id_to_button_map]
+        else:
+            # If there's no backup, the current order is the "Off" order.
+            ordered_buttons = all_buttons
+    else:  # "A-Z" or "Z-A"
+        is_reverse = (sort_mode == "Z-A")
+        all_buttons.sort(key=lambda btn: btn.embedding_name.lower(), reverse=is_reverse)
+        ordered_buttons = all_buttons
+
+    # 3. Completely clear the current state. This is the crucial step to avoid C++ errors.
+    card_actions.clear_merged_embeddings(main_window)
+
+    # 4. Re-populate the list from the sorted widget data.
+    for button in ordered_buttons:
+        list_view_actions.create_and_add_embed_button_to_list(
+            main_window=main_window,
+            embedding_name=button.embedding_name,
+            embedding_store=button.embedding_store,
+            embedding_id=button.embedding_id
+        )
+
+# This method is used to convert the data type of Parameters Dict
+# Parameters are converted to dict when serializing to JSON
+# Parameters are converted to ParametersDict when reading from JSON 
+def convert_parameters_to_supported_type(main_window: 'MainWindow', parameters: dict|ParametersTypes, convert_type: dict|misc_helpers.ParametersDict):
+    if convert_type==dict:
+        parameters = parameters.data
+    elif convert_type==misc_helpers.ParametersDict:
+        parameters = misc_helpers.ParametersDict(parameters, main_window.default_parameters)
+    return parameters
+
+def convert_markers_to_supported_type(main_window: 'MainWindow', markers: MarkerTypes, convert_type: dict|misc_helpers.ParametersDict):
+    # Convert Parameters inside the markers from ParametersDict to dict
+    for _,marker_data in markers.items():
+        for target_face_id, target_parameters in marker_data['parameters'].items():
+            marker_data['parameters'][target_face_id] = convert_parameters_to_supported_type(main_window, target_parameters, convert_type)
+    return markers
+
 def save_current_parameters_and_control(main_window: 'MainWindow', face_id):
     data_filename, _ = QtWidgets.QFileDialog.getSaveFileName(main_window, filter='JSON (*.json)')
     data = {
-        'parameters': main_window.parameters[face_id].copy(),
+        'parameters': convert_parameters_to_supported_type(main_window, main_window.parameters[face_id], dict),
         'control': main_window.control.copy(),
     }
 
@@ -94,14 +161,13 @@ def load_parameters_and_settings(main_window: 'MainWindow', face_id, load_settin
     if data_filename:
         with open(data_filename, 'r') as data_file: #pylint: disable=unspecified-encoding
             data = json.load(data_file)
-            main_window.parameters[face_id] = data['parameters'].copy()
+            main_window.parameters[face_id] = convert_parameters_to_supported_type(main_window, data['parameters'].copy(), misc_helpers.ParametersDict)
             if main_window.selected_target_face_id == face_id:
                 common_widget_actions.set_widgets_values_using_face_id_parameters(main_window, face_id)
             if load_settings:
-                main_window.control = data['control']
+                main_window.control.update(data['control'])
                 common_widget_actions.set_control_widgets_values(main_window)
             common_widget_actions.refresh_frame(main_window)
-
 
 def load_saved_workspace(main_window: 'MainWindow', data_filename: str|bool = False):
     if not data_filename:
@@ -153,6 +219,10 @@ def load_saved_workspace(main_window: 'MainWindow', data_filename: str|bool = Fa
                 embedding_store = {embed_model: np.array(embedding) for embed_model, embedding in embedding_data['embedding_store'].items()}
                 embedding_name = embedding_data['embedding_name']
                 list_view_actions.create_and_add_embed_button_to_list(main_window, embedding_name, embedding_store, embedding_id=embedding_id)
+            
+            main_window.unsorted_embedding_ids = list(main_window.merged_embeddings.keys())
+            if main_window.embedding_sort_mode != "Off":
+                reorder_embeddings_from_data(main_window, main_window.embedding_sort_mode)
 
             # Add target_faces
             for face_id, target_face_data in data['target_faces_data'].items():
@@ -160,7 +230,7 @@ def load_saved_workspace(main_window: 'MainWindow', data_filename: str|bool = Fa
                 pixmap = common_widget_actions.get_pixmap_from_frame(main_window, cropped_face)
                 embedding_store: Dict[str, np.ndarray] = {embed_model: np.array(embedding) for embed_model, embedding in target_face_data['embedding_store'].items()}
                 list_view_actions.add_media_thumbnail_to_target_faces_list(main_window, cropped_face, embedding_store, pixmap, face_id)
-                main_window.parameters[face_id] = target_face_data['parameters']
+                main_window.parameters[face_id] = convert_parameters_to_supported_type(main_window, data['target_faces_data'][face_id]['parameters'], misc_helpers.ParametersDict)
 
                 # Set assigned embeddinng buttons
                 embed_buttons = main_window.merged_embeddings
@@ -185,11 +255,19 @@ def load_saved_workspace(main_window: 'MainWindow', data_filename: str|bool = Fa
 
             # Add markers
             video_control_actions.remove_all_markers(main_window)
+
+            # Convert params to ParametersDict
+            data['markers'] = convert_markers_to_supported_type(main_window, data['markers'], misc_helpers.ParametersDict)
+        
             for marker_position, marker_data in data['markers'].items():
                 video_control_actions.add_marker(main_window, marker_data['parameters'], marker_data['control'], int(marker_position))
             # main_window.videoSeekSlider.setValue(0)
             # video_control_actions.update_widget_values_from_markers(main_window, 0)
 
+            # Set target media and input faces folder names
+            main_window.last_target_media_folder_path = data.get('last_target_media_folder_path','')
+            main_window.last_input_media_folder_path = data.get('last_input_media_folder_path','')
+            main_window.loaded_embedding_filename = data.get('loaded_embedding_filename', '')
             common_widget_actions.set_control_widgets_values(main_window)
             # Set output folder
             common_widget_actions.create_control(main_window, 'OutputMediaFolder', control['OutputMediaFolder'])
@@ -199,7 +277,10 @@ def load_saved_workspace(main_window: 'MainWindow', data_filename: str|bool = Fa
 
             if main_window.target_faces:
                 list(main_window.target_faces.values())[0].click()
-
+            else:
+                main_window.current_widget_parameters = data.get('current_widget_parameters', main_window.default_parameters.copy())
+                main_window.current_widget_parameters = misc_helpers.ParametersDict(main_window.current_widget_parameters, main_window.default_parameters)
+                common_widget_actions.set_widgets_values_using_face_id_parameters(main_window, face_id=False) 
         
 def save_current_workspace(main_window: 'MainWindow', data_filename:str|bool = False):
     target_faces_data = {}
@@ -211,7 +292,7 @@ def save_current_workspace(main_window: 'MainWindow', data_filename:str|bool = F
         target_faces_data[face_id] = {
             'cropped_face': target_face.cropped_face.tolist(), 
             'embedding_store': {embed_model: embedding.tolist() for embed_model, embedding in target_face.embedding_store.items()},
-            'parameters': main_window.parameters[face_id].copy(), #Store the current parameters. This will be overriden when loading the workspace, if there are markers for the video.
+            'parameters': main_window.parameters[face_id].data.copy(), #Store the current parameters. This will be overriden when loading the workspace, if there are markers for the video.
             'control': main_window.control.copy(), #Store the current control settings. This will be overriden when loading the workspace, if there are markers for the video.
             'assigned_input_faces': [input_face_id for input_face_id in target_face.assigned_input_faces.keys()],
             'assigned_merged_embeddings': [embedding_id for embedding_id in target_face.assigned_merged_embeddings.keys()],
@@ -224,14 +305,22 @@ def save_current_workspace(main_window: 'MainWindow', data_filename:str|bool = F
     
     target_medias_data = [{'media_id': media_id, 'media_path': target_media.media_path}  for media_id,target_media in main_window.target_videos.items() if not target_media.is_webcam]
     selected_media_id = main_window.selected_video_button.media_id if main_window.selected_video_button else False
+    markers = copy.deepcopy(main_window.markers)
+    # Convert params to dict
+    markers = convert_markers_to_supported_type(main_window, markers, dict)
+
     save_data = {
         'selected_media_id': selected_media_id,
         'target_medias_data': target_medias_data,
         'target_faces_data': target_faces_data,
         'embeddings_data': embeddings_data,
         'input_faces_data': input_faces_data,
-        'markers': main_window.markers,
-        'control': main_window.control
+        'markers': markers,
+        'control': main_window.control,
+        'last_target_media_folder_path': main_window.last_target_media_folder_path,
+        'last_input_media_folder_path': main_window.last_input_media_folder_path,
+        'loaded_embedding_filename': main_window.loaded_embedding_filename,
+        'current_widget_parameters': convert_parameters_to_supported_type(main_window, main_window.current_widget_parameters, dict)
     }
     if not data_filename:
         data_filename, _ = QtWidgets.QFileDialog.getSaveFileName(main_window, filter='JSON (*.json)')

@@ -6,6 +6,7 @@ from PySide6 import QtWidgets, QtGui, QtCore
 
 from app.ui.widgets.actions import common_actions as common_widget_actions
 from app.ui.widgets.actions import card_actions
+from app.ui.widgets.actions import video_control_actions
 from app.ui.widgets import widget_components
 import app.helpers.miscellaneous as misc_helpers
 from app.ui.widgets import ui_workers
@@ -45,7 +46,7 @@ def add_media_thumbnail_button(main_window: 'MainWindow', buttonClass: 'widget_c
 
     button: widget_components.CardButton = buttonClass(*constructor_args, main_window=main_window)
     button.setIcon(QtGui.QIcon(pixmap))
-    button.setIconSize(button_size - QtCore.QSize(3, 3))  # Slightly smaller than the button size to add some margin
+    button.setIconSize(button_size - QtCore.QSize(8, 8))  # Slightly smaller than the button size to add some margin
     button.setFixedSize(button_size)
     button.setCheckable(True)
     if buttonClass in [widget_components.TargetFaceCardButton, widget_components.InputFaceCardButton]:
@@ -58,6 +59,7 @@ def add_media_thumbnail_button(main_window: 'MainWindow', buttonClass: 'widget_c
     list_item = QtWidgets.QListWidgetItem(listWidget)
     list_item.setSizeHint(button_size)
     button.list_item = list_item
+    button.list_widget = listWidget
     # Align the item to center
     list_item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
     listWidget.setItemWidget(list_item, button)
@@ -74,7 +76,7 @@ def create_and_add_embed_button_to_list(main_window: 'MainWindow', embedding_nam
     # Passa l'intero embedding_store
     embed_button = widget_components.EmbeddingCardButton(main_window=main_window, embedding_name=embedding_name, embedding_store=embedding_store, embedding_id=embedding_id)
 
-    button_size = QtCore.QSize(120, 30)  # Imposta una dimensione fissa per i pulsanti
+    button_size = QtCore.QSize(105, 35)  # Adjusted width to fit 3 per row with proper spacing
     embed_button.setFixedSize(button_size)
     
     list_item = QtWidgets.QListWidgetItem(inputEmbeddingsList)
@@ -84,39 +86,121 @@ def create_and_add_embed_button_to_list(main_window: 'MainWindow', embedding_nam
     
     inputEmbeddingsList.setItemWidget(list_item, embed_button)
     
-    # Aggiungi padding attorno ai pulsanti
-    grid_size_with_padding = button_size + QtCore.QSize(4, 4)
-    inputEmbeddingsList.setGridSize(grid_size_with_padding)  # Add padding around the buttons
-    inputEmbeddingsList.setWrapping(True)  # Set grid size with padding
-    inputEmbeddingsList.setFlow(QtWidgets.QListView.LeftToRight)  # Set flow direction
-    inputEmbeddingsList.setResizeMode(QtWidgets.QListView.Adjust)  # Adjust layout automatically
+    # Configure grid layout for 3x3 minimum grid
+    grid_size_with_padding = button_size + QtCore.QSize(4, 4)  # Add padding around buttons
+    inputEmbeddingsList.setGridSize(grid_size_with_padding)
+    inputEmbeddingsList.setWrapping(True)
+    inputEmbeddingsList.setFlow(QtWidgets.QListView.TopToBottom)
+    inputEmbeddingsList.setResizeMode(QtWidgets.QListView.Fixed)
+    inputEmbeddingsList.setSpacing(2)
+    inputEmbeddingsList.setUniformItemSizes(True)
+    inputEmbeddingsList.setViewMode(QtWidgets.QListView.IconMode)
+    inputEmbeddingsList.setMovement(QtWidgets.QListView.Static)
+    
+    # Set viewport mode and item size
+    viewport_height = 180  # Fixed height for 3 rows (35px + padding per row)
+    inputEmbeddingsList.setFixedHeight(viewport_height)
+    
+    # Calculate grid dimensions
+    row_height = viewport_height // 3
+    col_width = grid_size_with_padding.width()
+    
+    # Set minimum width for 3 columns and adjust spacing
+    min_width = (3 * col_width) + 16  # Add extra padding for better spacing between columns
+    inputEmbeddingsList.setMinimumWidth(min_width)
+    
+    # Configure scrolling behavior
+    inputEmbeddingsList.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+    inputEmbeddingsList.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+    inputEmbeddingsList.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+    inputEmbeddingsList.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
+    
+    # Set layout direction to ensure proper filling
+    inputEmbeddingsList.setLayoutDirection(QtCore.Qt.LeftToRight)
+    inputEmbeddingsList.setLayoutMode(QtWidgets.QListView.Batched)
 
     main_window.merged_embeddings[embed_button.embedding_id] = embed_button
 
 def clear_stop_loading_target_media(main_window: 'MainWindow'):
-    if main_window.video_loader_worker:
+    if main_window.video_loader_worker and main_window.video_loader_worker.isRunning():
         main_window.video_loader_worker.stop()
-        main_window.video_loader_worker.terminate()
-        main_window.video_loader_worker = False
-        time.sleep(0.5)
-        main_window.targetVideosList.clear()
+    main_window.video_loader_worker = None
+    main_window.targetVideosList.clear()
+   
+def clear_all_target_media(main_window: 'MainWindow'):
+    """Removes all target media items from the list and resets the media player state."""
+    
+    # 1. Reset the main media player state if a video is currently selected.
+    if main_window.selected_video_button:
+        # Stop processing and release resources for the selected video
+        main_window.video_processor.stop_processing()
+        if main_window.selected_video_button.media_capture:
+            main_window.selected_video_button.media_capture.release()
+        main_window.selected_video_button.setChecked(False)
+
+        # Reset all related processor and state variables
+        main_window.video_processor.current_frame_number = 0
+        main_window.video_processor.media_path = False
+        main_window.parameters = {}
+        main_window.selected_target_face_id = False
+        main_window.video_processor.media_capture = False
+        main_window.video_processor.current_frame = []
+        main_window.video_processor.fps = 0
+        main_window.video_processor.max_frame_number = 0
+        main_window.scene.clear()
+        
+        # Reset UI components
+        video_control_actions.reset_media_buttons(main_window)
+        video_control_actions.set_up_video_seek_line_edit(main_window)
+        card_actions.clear_target_faces(main_window, refresh_frame=False)
+        video_control_actions.remove_all_markers(main_window)
+        main_window.cur_selected_target_face_button = False
+
+        # Reset the video seek slider
+        main_window.videoSeekSlider.blockSignals(True)
+        main_window.videoSeekSlider.setMaximum(1)
+        main_window.videoSeekSlider.setValue(0)
+        main_window.videoSeekSlider.blockSignals(False)
+
+        main_window.selected_video_button = False
+        main_window.graphicsViewFrame.update()
+        main_window.video_processor.file_type = None
+
+    # 2. Release resources for all other buttons and mark them for deletion.
+    for media_id in list(main_window.target_videos.keys()):
+        button = main_window.target_videos.pop(media_id)
+        if hasattr(button, 'media_capture') and button.media_capture:
+            button.media_capture.release()
+        button.deleteLater()
+    
+    main_window.target_videos.clear()
+
+    # 3. Clear the list widget in the UI.
+    main_window.targetVideosList.clear()
+
+    # 4. Update the placeholder text.
+    main_window.placeholder_update_signal.emit(main_window.targetVideosList, False)
 
 @QtCore.Slot()
 def select_target_medias(main_window: 'MainWindow', source_type='folder', folder_name=False, files_list=None):
     files_list = files_list or []
     if source_type=='folder':
-        folder_name = QtWidgets.QFileDialog.getExistingDirectory()
+        folder_name = QtWidgets.QFileDialog.getExistingDirectory(dir=main_window.last_target_media_folder_path)
         if not folder_name:
             return
         main_window.labelTargetVideosPath.setText(misc_helpers.truncate_text(folder_name))
         main_window.labelTargetVideosPath.setToolTip(folder_name)
+        main_window.last_target_media_folder_path = folder_name
 
     elif source_type=='files':
         files_list = QtWidgets.QFileDialog.getOpenFileNames()[0]
         if not files_list:
             return
-        main_window.labelTargetVideosPath.setText('Selected Files') #Just a temp text until i think of something better
-        main_window.labelTargetVideosPath.setToolTip('Selected Files')
+        # Get Folder name from the first file
+        file_dir = misc_helpers.get_dir_of_file(files_list[0])
+        main_window.labelTargetVideosPath.setText(file_dir) #Just a temp text until i think of something better
+        main_window.labelTargetVideosPath.setToolTip(file_dir)
+        main_window.last_target_media_folder_path = file_dir
 
     clear_stop_loading_target_media(main_window)
     card_actions.clear_target_faces(main_window)
@@ -126,6 +210,7 @@ def select_target_medias(main_window: 'MainWindow', source_type='folder', folder
 
     main_window.video_loader_worker = ui_workers.TargetMediaLoaderWorker(main_window=main_window, folder_name=folder_name, files_list=files_list)
     main_window.video_loader_worker.thumbnail_ready.connect(partial(add_media_thumbnail_to_target_videos_list, main_window))
+    main_window.video_loader_worker.finished.connect(main_window.on_adding_files_finished)
     main_window.video_loader_worker.start()
 
 @QtCore.Slot()
@@ -144,29 +229,30 @@ def load_target_webcams(main_window: 'MainWindow',):
         main_window.placeholder_update_signal.emit(main_window.targetVideosList, False)
 
 def clear_stop_loading_input_media(main_window: 'MainWindow'):
-    if main_window.input_faces_loader_worker:
+    if main_window.input_faces_loader_worker and main_window.input_faces_loader_worker.isRunning():
         main_window.input_faces_loader_worker.stop()
-        main_window.input_faces_loader_worker.terminate()
-        main_window.input_faces_loader_worker = False
-        time.sleep(0.5)
-        main_window.inputFacesList.clear()
+    main_window.input_faces_loader_worker = None
+    main_window.inputFacesList.clear()
 
 @QtCore.Slot()
 def select_input_face_images(main_window: 'MainWindow', source_type='folder', folder_name=False, files_list=None):
     files_list = files_list or []
     if source_type=='folder':
-        folder_name = QtWidgets.QFileDialog.getExistingDirectory()
-        main_window.labelInputFacesPath.setText(misc_helpers.truncate_text(folder_name))
-        main_window.labelInputFacesPath.setToolTip(folder_name)
+        folder_name = QtWidgets.QFileDialog.getExistingDirectory(dir=main_window.last_input_media_folder_path)
         if not folder_name:
             return
+        main_window.labelInputFacesPath.setText(misc_helpers.truncate_text(folder_name))
+        main_window.labelInputFacesPath.setToolTip(folder_name)
+        main_window.last_input_media_folder_path = folder_name
 
     elif source_type=='files':
         files_list = QtWidgets.QFileDialog.getOpenFileNames()[0]
-        main_window.labelInputFacesPath.setText('Selected Files') #Just a temp text until i think of something better
-        main_window.labelInputFacesPath.setToolTip('Selected Files')
         if not files_list:
             return
+        file_dir = misc_helpers.get_dir_of_file(files_list[0])
+        main_window.labelInputFacesPath.setText(file_dir) #Just a temp text until i think of something better
+        main_window.labelInputFacesPath.setToolTip(file_dir)
+        main_window.last_input_media_folder_path = file_dir
 
     clear_stop_loading_input_media(main_window)
     card_actions.clear_input_faces(main_window)

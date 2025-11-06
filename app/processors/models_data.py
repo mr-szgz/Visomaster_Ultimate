@@ -1,5 +1,6 @@
 models_dir = './model_assets'
 assets_repo = "https://github.com/visomaster/visomaster-assets/releases/download"
+assets_repo_external = "https://huggingface.co/facefusion/models-3.3.0/resolve/main"
 
 try:
     import tensorrt as trt
@@ -43,12 +44,32 @@ arcface_mapping_model_dict = {
     'InStyleSwapper256 Version A': 'Inswapper128ArcFace',
     'InStyleSwapper256 Version B': 'Inswapper128ArcFace',
     'InStyleSwapper256 Version C': 'Inswapper128ArcFace',
+    'Hyperswap256 Version A': 'Inswapper128ArcFace',
+    'Hyperswap256 Version B': 'Inswapper128ArcFace',
+    'Hyperswap256 Version C': 'Inswapper128ArcFace',
     'DeepFaceLive (DFM)': 'Inswapper128ArcFace',
     'SimSwap512': 'SimSwapArcFace',
     'GhostFace-v1': 'GhostArcFace',
     'GhostFace-v2': 'GhostArcFace',
     'GhostFace-v3': 'GhostArcFace',
     'CSCS': 'CSCSArcFace',
+}
+
+detection_model_mapping = {
+    'RetinaFace': 'RetinaFace',
+    'SCRFD': 'SCRFD2.5g',
+    'Yolov8': 'YoloFace8n',
+    'Yunet': 'YunetN',
+}
+
+landmark_model_mapping = {
+    '5': 'FaceLandmark5',
+    '68': 'FaceLandmark68',
+    '3d68': 'FaceLandmark3d68',
+    '98': 'FaceLandmark98',
+    '106': 'FaceLandmark106',
+    '203': 'FaceLandmark203',
+    '478': 'FaceLandmark478',
 }
 
 
@@ -397,6 +418,12 @@ models_list = [
 
     },
     {
+        "model_name": "RD64ClipText",
+        "local_path": f"{models_dir}/rd64-uni-refined.pth",
+        "hash": "a4956f9a7978a75630b08c9d6ec075b7c51cf43b4751b686e3a011d4012ddc9d",
+        "url": f"{assets_repo}/v0.1.0/rd64-uni-refined.pth",
+    },
+    {
         "model_name": "LivePortraitMotionExtractor",
         "local_path": f"{models_dir}/liveportrait_onnx/motion_extractor.onnx",
         "hash": "99d4b3c9dd3fd301910de9415a29560e38c0afaa702da51398281376cc36fdd3",
@@ -444,5 +471,23 @@ models_list = [
         "hash": "a6164debbf1e851c3dcefa622111c42a78afd9bb8f1540e7d01172ddf642c3b5",
         "url": f"{assets_repo}/v0.1.0_lp/warping_spade-fix.onnx"
 
+    },
+    {
+        "model_name": "Hyperswap256 Version A",
+        "local_path": f"{models_dir}/hyperswap_1a_256.onnx",
+        "hash": "c0e98a8a03a238f461ed3d2570e426b49f46745ee400854a60dceeb70c246add",
+        "url": f"{assets_repo_external}/hyperswap_1a_256.onnx"
+    },
+    {
+        "model_name": "Hyperswap256 Version B",
+        "local_path": f"{models_dir}/hyperswap_1b_256.onnx",
+        "hash": "5124031789c42f71b9558fb71954ef7aedb6da7ed9fac79293e23c61a792a73e",
+        "url": f"{assets_repo_external}/hyperswap_1b_256.onnx"
+    },
+    {
+        "model_name": "Hyperswap256 Version C",
+        "local_path": f"{models_dir}/hyperswap_1c_256.onnx",
+        "hash": "5528c2d76fe9986c99d829278987ef9f3a630cb606db7628d02b57b330f406a5",
+        "url": f"{assets_repo_external}/hyperswap_1c_256.onnx"
     }
 ]

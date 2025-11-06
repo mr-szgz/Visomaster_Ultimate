@@ -7,10 +7,12 @@ from pathlib import Path
 import os
 import gc
 from functools import partial
+from datetime import datetime
 
 import cv2
 import numpy
 import torch
+import pyvirtualcam
 
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from PySide6.QtGui import QPixmap
@@ -45,6 +47,8 @@ class VideoProcessor(QObject):
 
         self.current_frame: numpy.ndarray = []
         self.recording = False
+
+        self.virtcam: pyvirtualcam.Camera|None = None
 
         self.recording_sp: subprocess.Popen|None = None 
         self.temp_file = '' 
@@ -108,6 +112,9 @@ class VideoProcessor(QObject):
             pixmap, frame = self.frames_to_display.pop(self.next_frame_to_display)
             self.current_frame = frame
 
+            # Check and send the frame to virtualcam, if the option is selected
+            self.send_frame_to_virtualcam(frame)
+
             if self.recording:
                 self.recording_sp.stdin.write(frame.tobytes())
             # Update the widget values using parameters if it is not recording (The updation of actual parameters is already done inside the FrameWorker, this step is to make the changes appear in the widgets)
@@ -127,8 +134,21 @@ class VideoProcessor(QObject):
         else:
             pixmap, frame = self.webcam_frames_to_display.get()
             self.current_frame = frame
+            self.send_frame_to_virtualcam(frame)
             graphics_view_actions.update_graphics_view(self.main_window, pixmap, 0)
 
+    def send_frame_to_virtualcam(self, frame: numpy.ndarray):
+        if self.main_window.control['SendVirtCamFramesEnableToggle'] and self.virtcam:
+            # Check if the dimensions of the frame matches that of the Virtcam object
+            # If it doesn't match, reinstantiate the Virtcam object with new dimensions
+            height, width, _ = frame.shape
+            if self.virtcam.height!=height or self.virtcam.width!=width:
+                self.enable_virtualcam()
+            try:
+                self.virtcam.send(frame)
+                self.virtcam.sleep_until_next_frame()
+            except Exception as e:
+                print(e)
 
     def set_number_of_threads(self, value):
         self.stop_processing()
@@ -259,7 +279,7 @@ class VideoProcessor(QObject):
 
         # """Process a single image frame directly without queuing."""
         elif self.file_type == 'image':
-            frame = cv2.imread(self.media_path)
+            frame = misc_helpers.read_image_file(self.media_path)
             if frame is not None:
 
                 frame = frame[..., ::-1]  # Convert BGR to RGB
@@ -380,8 +400,9 @@ class VideoProcessor(QObject):
     def create_ffmpeg_subprocess(self):
         # Use Dimensions of the last processed frame as it could be different from the original frame due to restorers and frame enhancers 
         frame_height, frame_width, _ = self.current_frame.shape
-
-        self.temp_file = r'temp_output.mp4'
+        date_and_time = datetime.now().strftime(r'%Y_%m_%d_%H_%M_%S')
+        self.temp_file = f'temp_output_{date_and_time}.mp4'
+        #output_filename = f'{temp_path.stem}_{date_and_time}.mp4'
         if Path(self.temp_file).is_file():
             os.remove(self.temp_file)
 
@@ -401,3 +422,25 @@ class VideoProcessor(QObject):
         ]
 
         self.recording_sp = subprocess.Popen(args, stdin=subprocess.PIPE)
+
+    def enable_virtualcam(self, backend=False):
+        #Check if capture contains any cv2 stream or is it an empty list
+        if self.media_capture:
+            if isinstance(self.current_frame, numpy.ndarray):
+                frame_height, frame_width, _ = self.current_frame.shape
+            else:
+                frame_height = int(self.media_capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                frame_width = int(self.media_capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+            self.disable_virtualcam()
+            try:
+                backend = backend or self.main_window.control['VirtCamBackendSelection']
+                # self.virtcam = pyvirtualcam.Camera(width=vid_width, height=vid_height, fps=int(self.fps), backend='unitycapture', device='Unity Video Capture')
+                self.virtcam = pyvirtualcam.Camera(width=frame_width, height=frame_height, fps=int(self.fps), backend=backend, fmt=pyvirtualcam.PixelFormat.BGR)
+
+            except Exception as e:
+                print(e)
+
+    def disable_virtualcam(self):
+        if self.virtcam:
+            self.virtcam.close()
+        self.virtcam = None

@@ -1,3 +1,4 @@
+import os
 import threading
 from typing import TYPE_CHECKING, Callable
 from functools import partial
@@ -68,6 +69,8 @@ def create_default_parameter(main_window: 'MainWindow', parameter_name, paramete
 def create_parameter_dict_for_face_id(main_window: 'MainWindow', face_id=0):
     if not main_window.parameters.get(face_id):
         parameters =  main_window.parameters.get(main_window.selected_target_face_id) or main_window.current_widget_parameters or main_window.default_parameters
+        if type(parameters)==dict:
+            parameters = misc_helpers.ParametersDict(parameters, main_window.default_parameters)
         main_window.parameters[face_id] = parameters.copy()
     # print("Created parameter_dict_for_face_id", face_id)
 
@@ -81,8 +84,8 @@ def update_parameter(main_window: 'MainWindow', parameter_name, parameter_value,
         main_window.markers[current_position]['parameters'][face_id][parameter_name] = parameter_value
 
     if main_window.target_faces and face_id:
+        # Store old value and update the parameters with new value
         old_parameter_value = main_window.parameters[face_id][parameter_name]
-
         main_window.parameters[face_id][parameter_name] = parameter_value
 
         if enable_refresh_frame:
@@ -94,6 +97,9 @@ def update_parameter(main_window: 'MainWindow', parameter_name, parameter_value,
                 # By default an exec function definition should have atleast one parameter : MainWindow
                 exec_function_args = [main_window, parameter_value] + exec_function_args
                 exec_function(*exec_function_args)
+
+    if main_window.current_widget_parameters:
+        main_window.current_widget_parameters[parameter_name] = parameter_value
 
 def refresh_frame(main_window: 'MainWindow'):
     video_processor = main_window.video_processor
@@ -156,10 +162,15 @@ def show_hide_related_widgets(main_window: 'MainWindow', parent_widget, parent_w
                     elif '|' in parentToggles:
                         result = [item.strip() for item in parentToggles.split('|')]
                         parentToggle_ischecked = True
+                        # Check if any of the parentToggles are checked
                         for _, required_widget_name in enumerate(result):
                             ischecked = main_window.parameter_widgets[required_widget_name].isChecked()
-                            if not ischecked:
+                            if ischecked:
+                                parentToggle_ischecked = True
+                                break
+                            else:
                                 parentToggle_ischecked = False
+
                         # Check if the current_widget has the required toggle value of Parent Widget's (toggle) checked state to hide/show the current_widget
                         if group_layout_data[widget_name].get('requiredToggleValue') != parentToggle_ischecked:
                             current_widget.hide()
@@ -173,6 +184,29 @@ def show_hide_related_widgets(main_window: 'MainWindow', parent_widget, parent_w
                             current_widget.reset_default_button.show()
                             if current_widget.line_edit:
                                 current_widget.line_edit.show()
+
+                    elif '&' in parentToggles:
+                        result = [item.strip() for item in parentToggles.split('&')]
+                        parentToggle_ischecked = True
+                        # Check if any of the parentToggles are checked
+                        for _, required_widget_name in enumerate(result):
+                            ischecked = main_window.parameter_widgets[required_widget_name].isChecked()
+                            parentToggle_ischecked = parentToggle_ischecked and ischecked
+
+                        # Check if the current_widget has the required toggle value of Parent Widget's (toggle) checked state to hide/show the current_widget
+                        if group_layout_data[widget_name].get('requiredToggleValue') != parentToggle_ischecked:
+                            current_widget.hide()
+                            current_widget.label_widget.hide()
+                            current_widget.reset_default_button.hide()
+                            if current_widget.line_edit:
+                                current_widget.line_edit.hide()
+                        else:
+                            current_widget.show()
+                            current_widget.label_widget.show()
+                            current_widget.reset_default_button.show()
+                            if current_widget.line_edit:
+                                current_widget.line_edit.show()
+
                     else:
                         parentToggle_ischecked = main_window.parameter_widgets[parentToggles].isChecked()
                         if group_layout_data[widget_name].get('requiredToggleValue') != parentToggle_ischecked:
@@ -243,13 +277,49 @@ def clear_gpu_memory(main_window: 'MainWindow'):
 
 def extract_frame_as_pixmap(media_file_path, file_type, webcam_index=False, webcam_backend=False):
     frame = False
-    if file_type=='image':
-        frame = cv2.imread(media_file_path)
-    elif file_type=='video':    
+
+    def convert_thumbnail_frame_to_pixmap(frame):
+        # Convert the frame to QPixmap
+        height, width, _ = frame.shape
+        bytes_per_line = 3 * width
+        q_img = QtGui.QImage(frame.data, width, height, bytes_per_line, QtGui.QImage.Format.Format_RGB888).rgbSwapped()
+        pixmap = QtGui.QPixmap.fromImage(q_img)
+        pixmap = pixmap.scaled(70, 70, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+        return pixmap
+    
+    # For non-webcam media, check for cached thumbnail
+    if file_type in ['image', 'video']:
+        # Ensure thumbnail directory exists
+        misc_helpers.ensure_thumbnail_dir()
+        
+        # Get hash and thumbnail path
+        file_hash = misc_helpers.get_hash_from_filename(media_file_path)
+        thumbnail_path = misc_helpers.get_thumbnail_path(file_hash)
+        
+        # Check if cached thumbnail exists
+        if misc_helpers.is_file_exists(thumbnail_path):
+            frame = misc_helpers.read_image_file(thumbnail_path)
+            if frame is not None:
+                pixmap = convert_thumbnail_frame_to_pixmap(frame)
+                return pixmap
+    
+    # If no cached thumbnail or it's a webcam, proceed with normal frame extraction
+    if file_type == 'image':
+        frame = misc_helpers.read_image_file(media_file_path)
+    elif file_type == 'video':    
         cap = cv2.VideoCapture(media_file_path)
+        if not cap.isOpened():
+            return None
+        
+        # Get total frames and find the middle frame no
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        middle_frame_no = total_frames//2
+        # Seek to the middle frame
+        cap.set(cv2.CAP_PROP_POS_FRAMES, middle_frame_no)
         ret, frame = misc_helpers.read_frame(cap)
         cap.release()
-    elif file_type=='webcam':
+            
+    elif file_type == 'webcam':
         camera = cv2.VideoCapture(webcam_index, webcam_backend)
         if not camera.isOpened():
             return
@@ -258,12 +328,10 @@ def extract_frame_as_pixmap(media_file_path, file_type, webcam_index=False, webc
             return
 
     if isinstance(frame, np.ndarray):
-        # Convert the frame to QPixmap
-        height, width, _ = frame.shape
-        bytes_per_line = 3 * width
-        q_img = QtGui.QImage(frame.data, width, height, bytes_per_line, QtGui.QImage.Format.Format_RGB888).rgbSwapped()
-        pixmap = QtGui.QPixmap.fromImage(q_img)
-        pixmap = pixmap.scaled(70, 70, QtCore.Qt.AspectRatioMode.KeepAspectRatio)  # Adjust size as needed
+        # Save thumbnail for future use
+        if frame is not None and file_type != 'webcam':
+            misc_helpers.save_thumbnail(frame, thumbnail_path)
+        pixmap = convert_thumbnail_frame_to_pixmap(frame)
         return pixmap
     return None
 

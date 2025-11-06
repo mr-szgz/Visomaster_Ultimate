@@ -1,4 +1,3 @@
-
 from typing import TYPE_CHECKING, Dict
 import uuid
 
@@ -18,10 +17,14 @@ if TYPE_CHECKING:
 def clear_target_faces(main_window: 'MainWindow', refresh_frame=True):
     if main_window.video_processor.processing:
         main_window.video_processor.stop_processing()
-    main_window.targetFacesList.clear()
+    
+    # First, schedule the widgets for deletion
     for _, target_face in main_window.target_faces.items():
         target_face.deleteLater()
+    
+    # Then, clear the Python dictionary and the UI list
     main_window.target_faces = {}
+    main_window.targetFacesList.clear()
     main_window.parameters = {}
 
     main_window.selected_target_face_id = False
@@ -32,10 +35,13 @@ def clear_target_faces(main_window: 'MainWindow', refresh_frame=True):
 
     
 def clear_input_faces(main_window: 'MainWindow'):
-    main_window.inputFacesList.clear()
+    # First, schedule the widgets for deletion
     for _, input_face in main_window.input_faces.items():
         input_face.deleteLater()
+        
+    # Then, clear the Python dictionary and the UI list
     main_window.input_faces = {}
+    main_window.inputFacesList.clear()
 
     for _, target_face in main_window.target_faces.items():
         target_face.assigned_input_faces = {}
@@ -43,11 +49,15 @@ def clear_input_faces(main_window: 'MainWindow'):
     common_widget_actions.refresh_frame(main_window=main_window)
 
 def clear_merged_embeddings(main_window: 'MainWindow'):
-    main_window.inputEmbeddingsList.clear()
+    # First, schedule the widgets for deletion
     for _, embed_button in main_window.merged_embeddings.items():
         embed_button.deleteLater()
-    main_window.merged_embeddings = {}
 
+    # Then, clear the Python dictionary and the UI list
+    main_window.merged_embeddings = {}
+    main_window.inputEmbeddingsList.clear()
+    
+    # Finally, update any dependent objects
     for _, target_face in main_window.target_faces.items():
         target_face.assigned_merged_embeddings = {}
         target_face.calculate_assigned_input_embedding()
@@ -70,7 +80,7 @@ def find_target_faces(main_window: 'MainWindow'):
         media_capture = video_processor.media_capture
 
         if video_processor.file_type=='image':
-            frame = cv2.imread(video_processor.media_path)
+            frame = misc_helpers.read_image_file(video_processor.media_path)
         elif video_processor.file_type=='video' and media_capture:
             ret,frame = misc_helpers.read_frame(media_capture)
             media_capture.set(cv2.CAP_PROP_POS_FRAMES, video_processor.current_frame_number)

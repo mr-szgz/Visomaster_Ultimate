@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1376</width>
-    <height>586</height>
+    <height>585</height>
    </rect>
   </property>
   <property name="font">
@@ -16,10 +16,10 @@
    </font>
   </property>
   <property name="windowTitle">
-   <string>VisoMaster v0.1.1-dev</string>
+   <string>VisoMaster v0.1.6</string>
   </property>
   <property name="windowIcon">
-   <iconset>
+   <iconset resource="media.qrc">
     <normaloff>:/media/media/visomaster_small.png</normaloff>:/media/media/visomaster_small.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
@@ -72,11 +72,25 @@
            </property>
            <property name="sizeHint" stdset="0">
             <size>
-             <width>40</width>
+             <width>20</width>
              <height>20</height>
             </size>
            </property>
           </spacer>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="faceCompareCheckBox">
+           <property name="text">
+            <string>VIew Face Compare</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QCheckBox" name="faceMaskCheckBox">
+           <property name="text">
+            <string>View Face Mask</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
@@ -154,7 +168,7 @@
               <string/>
              </property>
              <property name="icon">
-              <iconset>
+              <iconset resource="media.qrc">
                <normaloff>:/media/media/previous_marker_off.png</normaloff>:/media/media/previous_marker_off.png</iconset>
              </property>
              <property name="flat">
@@ -184,7 +198,7 @@
               <string/>
              </property>
              <property name="icon">
-              <iconset>
+              <iconset resource="media.qrc">
                <normaloff>:/media/media/rec_off.png</normaloff>:/media/media/rec_off.png</iconset>
              </property>
              <property name="checkable">
@@ -229,7 +243,7 @@
               <string/>
              </property>
              <property name="icon">
-              <iconset>
+              <iconset resource="media.qrc">
                <normaloff>:/media/media/play_off.png</normaloff>:/media/media/play_off.png</iconset>
              </property>
              <property name="checkable">
@@ -274,7 +288,7 @@
               <string/>
              </property>
              <property name="icon">
-              <iconset>
+              <iconset resource="media.qrc">
                <normaloff>:/media/media/next_marker_off.png</normaloff>:/media/media/next_marker_off.png</iconset>
              </property>
              <property name="flat">
@@ -307,7 +321,7 @@
               <string/>
              </property>
              <property name="icon">
-              <iconset>
+              <iconset resource="media.qrc">
                <normaloff>:/media/media/add_marker_hover.png</normaloff>:/media/media/add_marker_hover.png</iconset>
              </property>
              <property name="flat">
@@ -324,7 +338,7 @@
               <string/>
              </property>
              <property name="icon">
-              <iconset>
+              <iconset resource="media.qrc">
                <normaloff>:/media/media/remove_marker_hover.png</normaloff>:/media/media/remove_marker_hover.png</iconset>
              </property>
              <property name="flat">
@@ -341,7 +355,7 @@
               <string/>
              </property>
              <property name="icon">
-              <iconset>
+              <iconset resource="media.qrc">
                <normaloff>:/media/media/previous_marker_hover.png</normaloff>:/media/media/previous_marker_hover.png</iconset>
              </property>
              <property name="flat">
@@ -358,7 +372,7 @@
               <string/>
              </property>
              <property name="icon">
-              <iconset>
+              <iconset resource="media.qrc">
                <normaloff>:/media/media/next_marker_hover.png</normaloff>:/media/media/next_marker_hover.png</iconset>
              </property>
              <property name="flat">
@@ -375,7 +389,7 @@
               <string/>
              </property>
              <property name="icon">
-              <iconset>
+              <iconset resource="media.qrc">
                <normaloff>:/media/media/fullscreen.png</normaloff>:/media/media/fullscreen.png</iconset>
              </property>
              <property name="flat">
@@ -446,102 +460,6 @@
           <bool>false</bool>
          </property>
          <layout class="QGridLayout" name="gridLayout_2">
-          <item row="0" column="0">
-           <layout class="QHBoxLayout" name="horizontalLayout_4">
-            <item>
-             <widget class="QPushButton" name="saveImageButton">
-              <property name="text">
-               <string>Save Image</string>
-              </property>
-              <property name="flat">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item row="1" column="2">
-           <widget class="QListWidget" name="inputEmbeddingsList">
-            <property name="sizePolicy">
-             <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-              <horstretch>0</horstretch>
-              <verstretch>0</verstretch>
-             </sizepolicy>
-            </property>
-            <property name="toolTip">
-             <string>Save Embedding</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="2">
-           <layout class="QHBoxLayout" name="horizontalLayout_3">
-            <item>
-             <widget class="QLineEdit" name="inputEmbeddingsSearchBox">
-              <property name="placeholderText">
-               <string>Search Embeddings</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="openEmbeddingButton">
-              <property name="toolTip">
-               <string>Open Embedding File</string>
-              </property>
-              <property name="text">
-               <string/>
-              </property>
-              <property name="icon">
-               <iconset>
-                <normaloff>:/media/media/open_file.png</normaloff>:/media/media/open_file.png</iconset>
-              </property>
-              <property name="flat">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="saveEmbeddingButton">
-              <property name="toolTip">
-               <string>Save Embedding</string>
-              </property>
-              <property name="text">
-               <string/>
-              </property>
-              <property name="icon">
-               <iconset>
-                <normaloff>:/media/media/save_file.png</normaloff>:/media/media/save_file.png</iconset>
-              </property>
-              <property name="flat">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="saveEmbeddingAsButton">
-              <property name="toolTip">
-               <string>Save Embedding As</string>
-              </property>
-              <property name="text">
-               <string/>
-              </property>
-              <property name="icon">
-               <iconset>
-                <normaloff>:/media/media/save_file_as.png</normaloff>:/media/media/save_file_as.png</iconset>
-              </property>
-              <property name="flat">
-               <bool>true</bool>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item row="1" column="1">
-           <widget class="QListWidget" name="targetFacesList">
-            <property name="autoFillBackground">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
           <item row="1" column="0">
            <widget class="QWidget" name="facesButtonsWidget" native="true">
             <property name="sizePolicy">
@@ -621,6 +539,144 @@
             </layout>
            </widget>
           </item>
+          <item row="1" column="2">
+           <widget class="QListWidget" name="inputEmbeddingsList">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <horstretch>4</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>320</width>
+              <height>120</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>120</height>
+             </size>
+            </property>
+            <property name="verticalScrollBarPolicy">
+             <enum>Qt::ScrollBarAlwaysOff</enum>
+            </property>
+            <property name="horizontalScrollBarPolicy">
+             <enum>Qt::ScrollBarAsNeeded</enum>
+            </property>
+            <property name="toolTip">
+             <string>Save Embedding</string>
+            </property>
+            <property name="uniformItemSizes">
+             <bool>true</bool>
+            </property>
+            <property name="viewMode">
+             <enum>QListView::IconMode</enum>
+            </property>
+            <property name="movement">
+             <enum>QListView::Static</enum>
+            </property>
+            <property name="wrapping">
+             <bool>true</bool>
+            </property>
+            <property name="layoutMode">
+             <enum>QListView::Batched</enum>
+            </property>
+            <property name="spacing">
+             <number>4</number>
+            </property>
+            <property name="autoScroll">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="0">
+           <layout class="QHBoxLayout" name="horizontalLayout_4">
+            <item>
+             <widget class="QPushButton" name="saveImageButton">
+              <property name="text">
+               <string>Save Image</string>
+              </property>
+              <property name="flat">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="0" column="2">
+           <layout class="QHBoxLayout" name="horizontalLayout_3">
+            <item>
+             <widget class="QLineEdit" name="inputEmbeddingsSearchBox">
+              <property name="placeholderText">
+               <string>Search Embeddings</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="openEmbeddingButton">
+              <property name="toolTip">
+               <string>Open Embedding File</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset resource="media.qrc">
+                <normaloff>:/media/media/open_file.png</normaloff>:/media/media/open_file.png</iconset>
+              </property>
+              <property name="flat">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="saveEmbeddingButton">
+              <property name="toolTip">
+               <string>Save Embedding</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset resource="media.qrc">
+                <normaloff>:/media/media/save_file.png</normaloff>:/media/media/save_file.png</iconset>
+              </property>
+              <property name="flat">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="saveEmbeddingAsButton">
+              <property name="toolTip">
+               <string>Save Embedding As</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset resource="media.qrc">
+                <normaloff>:/media/media/save_file_as.png</normaloff>:/media/media/save_file_as.png</iconset>
+              </property>
+              <property name="flat">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="1" column="1">
+           <widget class="QListWidget" name="targetFacesList">
+            <property name="autoFillBackground">
+             <bool>true</bool>
+            </property>
+            <property name="autoScroll">
+             <bool>false</bool>
+            </property>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>
@@ -632,14 +688,14 @@
   <widget class="QDockWidget" name="input_Target_DockWidget">
    <property name="sizePolicy">
     <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-     <horstretch>0</horstretch>
+     <horstretch>4</horstretch>
      <verstretch>0</verstretch>
     </sizepolicy>
    </property>
    <property name="minimumSize">
     <size>
      <width>340</width>
-     <height>347</height>
+     <height>369</height>
     </size>
    </property>
    <property name="features">
@@ -662,14 +718,47 @@
          </property>
          <layout class="QGridLayout" name="gridLayout_3">
           <item row="0" column="0">
-           <widget class="QLabel" name="labelTargetVideosPath">
-            <property name="text">
-             <string>Select Videos/Images Path</string>
-            </property>
-            <property name="wordWrap">
-             <bool>false</bool>
-            </property>
-           </widget>
+           <layout class="QHBoxLayout" name="horizontalLayout_7">
+            <item>
+             <widget class="QLabel" name="labelTargetVideosPath">
+              <property name="text">
+               <string>Select Videos/Images Path</string>
+              </property>
+              <property name="wordWrap">
+               <bool>false</bool>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="buttonTargetVideosPath">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="toolTip">
+               <string>Choose Target Media Folder</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset resource="media.qrc">
+                <normaloff>:/media/media/open_file.png</normaloff>:/media/media/open_file.png</iconset>
+              </property>
+              <property name="iconSize">
+               <size>
+                <width>18</width>
+                <height>18</height>
+               </size>
+              </property>
+              <property name="flat">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
          </layout>
         </widget>
@@ -695,7 +784,7 @@
             <string/>
            </property>
            <property name="icon">
-            <iconset>
+            <iconset resource="media.qrc">
              <normaloff>:/media/media/image.png</normaloff>:/media/media/image.png</iconset>
            </property>
            <property name="checked">
@@ -712,7 +801,7 @@
             <string/>
            </property>
            <property name="icon">
-            <iconset>
+            <iconset resource="media.qrc">
              <normaloff>:/media/media/video.png</normaloff>:/media/media/video.png</iconset>
            </property>
            <property name="checked">
@@ -729,7 +818,7 @@
             <string/>
            </property>
            <property name="icon">
-            <iconset>
+            <iconset resource="media.qrc">
              <normaloff>:/media/media/webcam.png</normaloff>:/media/media/webcam.png</iconset>
            </property>
            <property name="checked">
@@ -744,6 +833,9 @@
          <property name="acceptDrops">
           <bool>true</bool>
          </property>
+         <property name="autoScroll">
+          <bool>false</bool>
+         </property>
         </widget>
        </item>
        <item>
@@ -753,11 +845,44 @@
          </property>
          <layout class="QGridLayout" name="gridLayout">
           <item row="0" column="0">
-           <widget class="QLabel" name="labelInputFacesPath">
-            <property name="text">
-             <string>Select Face Images Path</string>
-            </property>
-           </widget>
+           <layout class="QHBoxLayout" name="horizontalLayout_8">
+            <item>
+             <widget class="QLabel" name="labelInputFacesPath">
+              <property name="text">
+               <string>Select Face Images Path</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="buttonInputFacesPath">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="toolTip">
+               <string>Choose Input Faces Folder</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="icon">
+               <iconset resource="media.qrc">
+                <normaloff>:/media/media/open_file.png</normaloff>:/media/media/open_file.png</iconset>
+              </property>
+              <property name="iconSize">
+               <size>
+                <width>18</width>
+                <height>18</height>
+               </size>
+              </property>
+              <property name="flat">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
          </layout>
         </widget>
@@ -773,6 +898,9 @@
         <widget class="QListWidget" name="inputFacesList">
          <property name="acceptDrops">
           <bool>true</bool>
+         </property>
+         <property name="autoScroll">
+          <bool>false</bool>
          </property>
         </widget>
        </item>
