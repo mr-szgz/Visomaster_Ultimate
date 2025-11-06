@@ -4,7 +4,6 @@ from collections import OrderedDict
 import platform
 from queue import Queue
 from threading import Lock
-from typing import Dict, Any, OrderedDict as OrderedDictType
 
 try:
     from torch.cuda import nvtx
@@ -32,273 +31,258 @@ else:
     numpy_to_torch_dtype_dict[np.bool] = torch.bool
 
 if 'trt' in globals():
-    # Creazione di un’istanza globale di logger di TensorRT
+    # Creazione di un'istanza globale di logger di TensorRT
     TRT_LOGGER = trt.Logger(trt.Logger.ERROR)
 else:
-    TRT_LOGGER = None
+    TRT_LOGGER = {}
 
-
+# imported from https://github.com/warmshao/FasterLivePortrait/blob/master/src/models/predictor.py
+# adjusted to work with TensorRT 10.3.0
 class TensorRTPredictor:
     """
-    Implementa l'inferenza su un engine TensorRT, utilizzando un pool di execution context
-    ognuno dei quali possiede i propri buffer per garantire la sicurezza in ambiente multithread.
+    Implements inference for the TensorRT engine with a pool of execution contexts.
     """
 
-    def __init__(self, **kwargs) -> None:
+    def __init__(self, **kwargs):
         """
-        :param model_path: Percorso al file dell'engine serializzato.
-        :param pool_size: Numero di execution context da mantenere nel pool.
-        :param custom_plugin_path: (Opzionale) percorso a eventuali plugin personalizzati.
-        :param device: Device su cui allocare i tensori (default 'cuda').
-        :param debug: Se True, stampa informazioni di debug.
+        :param engine_path: The path to the serialized engine to load from disk.
+        :param pool_size: The size of the pool of execution contexts.
         """
-        self.device = kwargs.get("device", 'cuda')
-        self.debug = kwargs.get("debug", False)
-        self.pool_size = kwargs.get("pool_size", 10)
+        global TRT_LOGGER
 
-        # Caricamento del plugin personalizzato (se fornito)
+        # Inizializzazione del modello TensorRT
+        self.engine = None
+        self.context_pool = None
+        self.lock = Lock()
+        self.device = kwargs.get("device", 'cuda')
+
         custom_plugin_path = kwargs.get("custom_plugin_path", None)
         if custom_plugin_path is not None:
-            try:
-                if platform.system().lower() == 'linux':
-                    ctypes.CDLL(custom_plugin_path, mode=ctypes.RTLD_GLOBAL)
-                else:
-                    # Su Windows eventualmente usare WinDLL o parametri specifici
-                    ctypes.CDLL(custom_plugin_path, mode=ctypes.RTLD_GLOBAL, winmode=0)
-            except Exception as e:
-                raise RuntimeError(f"Errore nel caricamento del plugin personalizzato: {e}")
+            # Carica il plugin personalizzato solo una volta
+            if platform.system().lower() == 'linux':
+                ctypes.CDLL(custom_plugin_path, mode=ctypes.RTLD_GLOBAL)
+            else:
+                ctypes.CDLL(custom_plugin_path, mode=ctypes.RTLD_GLOBAL, winmode=0)
 
-        # Verifica che il percorso del modello sia fornito
+        # Load TRT engine
         engine_path = kwargs.get("model_path", None)
-        if not engine_path:
-            raise ValueError("Il parametro 'model_path' è obbligatorio.")
+        self.debug = kwargs.get("debug", False)
+        self.pool_size = kwargs.get("pool_size", 10)
+        assert engine_path, f"model:{engine_path} must exist!"
 
         # Caricamento dell'engine TensorRT
-        try:
-            with open(engine_path, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
-                engine_data = f.read()
-                self.engine = runtime.deserialize_cuda_engine(engine_data)
-        except Exception as e:
-            raise RuntimeError(f"Errore nella deserializzazione dell'engine: {e}")
+        with open(engine_path, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
+            assert runtime
+            self.engine = runtime.deserialize_cuda_engine(f.read())
+        assert self.engine
 
-        if self.engine is None:
-            raise RuntimeError("La deserializzazione dell'engine è fallita.")
-
-        # Setup delle specifiche di I/O (input e output)
+        # Setup I/O bindings e contesto
         self.inputs = []
         self.outputs = []
+        self.tensors = OrderedDict()
+
+        # Gestione dei tensori dinamici
         for idx in range(self.engine.num_io_tensors):
             name = self.engine.get_tensor_name(idx)
-            mode = self.engine.get_tensor_mode(name)
-            shape = list(self.engine.get_tensor_shape(name))
+            is_input = self.engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT
+            shape = self.engine.get_tensor_shape(name)
             dtype = trt.nptype(self.engine.get_tensor_dtype(name))
+
             binding = {
                 "index": idx,
                 "name": name,
                 "dtype": dtype,
-                "shape": shape,
+                "shape": list(shape)
             }
-            if mode == trt.TensorIOMode.INPUT:
+            if is_input:
                 self.inputs.append(binding)
             else:
                 self.outputs.append(binding)
 
-        if len(self.inputs) == 0 or len(self.outputs) == 0:
-            raise RuntimeError("L'engine deve avere almeno un input e un output.")
+        assert len(self.inputs) > 0
+        assert len(self.outputs) > 0
+        self.allocate_max_buffers()
 
-        # Creazione del pool di execution context
+        # Creazione del pool di contesti di esecuzione
         self.context_pool = Queue(maxsize=self.pool_size)
-        # (Opzionale) Lock per eventuali operazioni critiche
-        self.lock = Lock()
         for _ in range(self.pool_size):
-            context = self.engine.create_execution_context()
-            buffers = self._allocate_buffers()
-            self.context_pool.put({"context": context, "buffers": buffers})
+            self.context_pool.put(self.engine.create_execution_context())
 
-    def _allocate_buffers(self) -> OrderedDictType[str, torch.Tensor]:
-        """
-        Alloca un dizionario di tensori per tutti gli I/O del modello, tenendo conto di eventuali
-        dimensioni dinamiche. Viene restituito un OrderedDict in cui la chiave è il nome del tensore.
-        """
+    def allocate_max_buffers(self):
         nvtx.range_push("allocate_max_buffers")
-        buffers = OrderedDict()
-        # Batch size predefinito
+        # Supporto per batch dinamico
         batch_size = 1
         for idx in range(self.engine.num_io_tensors):
-            name = self.engine.get_tensor_name(idx)
-            shape = list(self.engine.get_tensor_shape(name))  # assicuriamoci di avere una lista
-            is_input = self.engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT
+            binding = self.engine.get_tensor_name(idx)
+            shape = self.engine.get_tensor_shape(binding)
+            is_input = self.engine.get_tensor_mode(binding) == trt.TensorIOMode.INPUT
             if -1 in shape:
                 if is_input:
-                    # Ottiene la shape massima per il profilo 0
-                    profile_shape = self.engine.get_tensor_profile_shape(name, 0)[-1]
-                    shape = list(profile_shape)
+                    shape = self.engine.get_tensor_profile_shape(binding, 0)[-1]
                     batch_size = shape[0]
                 else:
                     shape[0] = batch_size
-            dtype = trt.nptype(self.engine.get_tensor_dtype(name))
-            if dtype not in numpy_to_torch_dtype_dict:
-                raise TypeError(f"Tipo numpy non supportato: {dtype}")
-            tensor = torch.empty(tuple(shape),
-                                 dtype=numpy_to_torch_dtype_dict[dtype],
-                                 device=self.device)
-            buffers[name] = tensor
+            dtype = trt.nptype(self.engine.get_tensor_dtype(binding))
+            tensor = torch.empty(
+                tuple(shape), dtype=numpy_to_torch_dtype_dict[dtype]
+            ).to(device=self.device)
+            self.tensors[binding] = tensor
         nvtx.range_pop()
-        return buffers
 
-    def input_spec(self) -> list:
+    def input_spec(self):
         """
-        Restituisce le specifiche degli input (nome, shape, dtype) utili per preparare gli array.
+        Get the specs for the input tensor of the network. Useful to prepare memory allocations.
+        :return: Two items, the shape of the input tensor and its (numpy) datatype.
         """
         specs = []
-        for i, inp in enumerate(self.inputs):
-            specs.append((inp["name"], inp["shape"], inp["dtype"]))
+        for i, o in enumerate(self.inputs):
+            specs.append((o["name"], o['shape'], o['dtype']))
             if self.debug:
-                print(f"trt input {i} -> {inp['name']} -> {inp['shape']} -> {inp['dtype']}")
+                print(f"trt input {i} -> {o['name']} -> {o['shape']} -> {o['dtype']}")
         return specs
 
-    def output_spec(self) -> list:
+    def output_spec(self):
         """
-        Restituisce le specifiche degli output (nome, shape, dtype) utili per preparare gli array.
+        Get the specs for the output tensors of the network. Useful to prepare memory allocations.
+        :return: A list with two items per element, the shape and (numpy) datatype of each output tensor.
         """
         specs = []
-        for i, out in enumerate(self.outputs):
-            specs.append((out["name"], out["shape"], out["dtype"]))
+        for i, o in enumerate(self.outputs):
+            specs.append((o["name"], o['shape'], o['dtype']))
             if self.debug:
-                print(f"trt output {i} -> {out['name']} -> {out['shape']} -> {out['dtype']}")
+                print(f"trt output {i} -> {o['name']} -> {o['shape']} -> {o['dtype']}")
         return specs
 
-    def adjust_buffer(self, feed_dict: Dict[str, Any], context: Any, buffers: OrderedDictType[str, torch.Tensor]) -> None:
+    def adjust_buffer(self, feed_dict, context):
         """
-        Regola le dimensioni dei buffer di input e copia i dati dal feed_dict nei tensori allocati.
-        Se l’input è un array NumPy, lo converte in tensore Torch (sul device corretto).
-        Imposta inoltre la shape di input nel contesto di esecuzione.
+        Adjust input buffer sizes and set input shapes in the given execution context.
+        :param feed_dict: A dictionary of inputs as numpy arrays.
+        :param context: The TensorRT execution context to set input shapes.
         """
         nvtx.range_push("adjust_buffer")
         for name, buf in feed_dict.items():
-            if name not in buffers:
-                raise KeyError(f"Input '{name}' non trovato nei buffer allocati.")
-            input_tensor = buffers[name]
-            # Converte in tensore se necessario
-            if isinstance(buf, np.ndarray):
-                buf_tensor = torch.from_numpy(buf).to(input_tensor.device)
-            elif isinstance(buf, torch.Tensor):
-                buf_tensor = buf.to(input_tensor.device)
-            else:
-                raise TypeError(f"Tipo di dato per '{name}' non supportato: {type(buf)}")
-            current_shape = list(buf_tensor.shape)
-            # Copia solo la porzione effettivamente utilizzata nel buffer preallocato
+            input_tensor = self.tensors[name]
+            current_shape = list(buf.shape)
             slices = tuple(slice(0, dim) for dim in current_shape)
-            input_tensor[slices].copy_(buf_tensor)
-            # Imposta la shape dell'input nel contesto
+            input_tensor[slices].copy_(buf)
+            # Imposta la forma di input nel contesto fornito
             context.set_input_shape(name, current_shape)
         nvtx.range_pop()
 
-    def predict(self, feed_dict: Dict[str, Any]) -> OrderedDictType[str, torch.Tensor]:
+    def predict(self, feed_dict):
         """
-        Esegue l'inferenza in modalità sincrona usando execute_v2().
-
-        :param feed_dict: Dizionario di input (array numpy o tensori Torch).
-        :return: Dizionario dei tensori (input e output) aggiornati.
+        Execute inference on a batch of images in synchronous mode using execute_v2.
+        :param feed_dict: A dictionary of inputs as numpy arrays.
+        :return: A dictionary of outputs as PyTorch tensors.
         """
-        pool_entry = self.context_pool.get()  # La Queue è thread-safe
-        context = pool_entry["context"]
-        buffers = pool_entry["buffers"]
+        # Ottieni un contesto dal pool
+        with self.lock:
+            context = self.context_pool.get()
 
         try:
             nvtx.range_push("set_tensors")
-            self.adjust_buffer(feed_dict, context, buffers)
-            # Imposta gli indirizzi dei buffer
-            for name, tensor in buffers.items():
-                # Se necessario, si può controllare che il tipo del tensore sia quello atteso
+            # Passa il contesto a adjust_buffer
+            self.adjust_buffer(feed_dict, context)
+
+            for name, tensor in self.tensors.items():
+                assert tensor.dtype == torch.float32, f"Tensor '{name}' should be torch.float32 but is {tensor.dtype}"
                 context.set_tensor_address(name, tensor.data_ptr())
+
             nvtx.range_pop()
 
-            # Prepara i binding (lista degli indirizzi dei buffer)
-            bindings = [tensor.data_ptr() for tensor in buffers.values()]
+            # Prepara i binding per execute_v2()
+            bindings = [tensor.data_ptr() for tensor in self.tensors.values()]
 
+            # Esecuzione sincrona con execute_v2()
             nvtx.range_push("execute")
             noerror = context.execute_v2(bindings)
-            nvtx.range_pop()
             if not noerror:
-                raise RuntimeError("ERROR: inference failed.")
+                raise ValueError("ERROR: inference failed.")
+            nvtx.range_pop()
 
-            # (Opzionalmente, si potrebbero restituire solo gli output)
-            return buffers
+            return self.tensors
 
         finally:
             # Sincronizza il flusso CUDA prima di restituire il contesto
-            torch.cuda.synchronize()
-            self.context_pool.put(pool_entry)
+            torch.cuda.synchronize()  # Sincronizza il default stream
+            # Restituisci il contesto al pool dopo l'uso
+            with self.lock:
+                self.context_pool.put(context)
 
-    def predict_async(self, feed_dict: Dict[str, Any], stream: torch.cuda.Stream) -> OrderedDictType[str, torch.Tensor]:
+    def predict_async(self, feed_dict, stream):
         """
-        Esegue l'inferenza in modalità asincrona usando execute_async_v3().
-
-        :param feed_dict: Dizionario di input (array numpy o tensori Torch).
-        :param stream: Un CUDA stream per l'esecuzione asincrona.
-        :return: Dizionario dei tensori (input e output) aggiornati.
+        Execute inference on a batch of images in asynchronous mode using execute_async_v3.
+        :param feed_dict: A dictionary of inputs as numpy arrays.
+        :param stream: A CUDA stream for asynchronous execution.
+        :return: A dictionary of outputs as PyTorch tensors.
         """
-        pool_entry = self.context_pool.get()
-        context = pool_entry["context"]
-        buffers = pool_entry["buffers"]
+        # Ottieni un contesto dal pool
+        with self.lock:
+            context = self.context_pool.get()
 
         try:
             nvtx.range_push("set_tensors")
-            self.adjust_buffer(feed_dict, context, buffers)
-            for name, tensor in buffers.items():
+            # Passa il contesto a adjust_buffer
+            self.adjust_buffer(feed_dict, context)
+
+            for name, tensor in self.tensors.items():
+                assert tensor.dtype == torch.float32, f"Tensor '{name}' should be torch.float32 but is {tensor.dtype}"
                 context.set_tensor_address(name, tensor.data_ptr())
+
             nvtx.range_pop()
 
-            # Creazione di un evento CUDA per monitorare il consumo dell'input
+            # Creare un evento CUDA per tracciare il consumo dell'input
             input_consumed_event = torch.cuda.Event()
-            context.set_input_consumed_event(input_consumed_event.cuda_event)
 
+            # Impostare l'evento per l'input consumato
+            context.set_input_consumed_event(input_consumed_event.cuda_event)
+        
+            # Esecuzione asincrona con execute_async_v3()
             nvtx.range_push("execute_async")
             noerror = context.execute_async_v3(stream.cuda_stream)
-            nvtx.range_pop()
             if not noerror:
-                raise RuntimeError("ERROR: inference failed.")
+                raise ValueError("ERROR: inference failed.")
+            nvtx.range_pop()
 
+            # Sincronizzare l'evento dell'input consumato (se necessario)
             input_consumed_event.synchronize()
 
-            return buffers
+            return self.tensors
 
         finally:
-            # Sincronizza lo stream usato se diverso da quello corrente
+            # Sincronizza il flusso CUDA prima di restituire il contesto
             if stream != torch.cuda.current_stream():
-                stream.synchronize()
+                stream.synchronize()  # Sincronizza lo stream personalizzato
             else:
-                torch.cuda.synchronize()
-            self.context_pool.put(pool_entry)
+                torch.cuda.synchronize()  # Sincronizza il default stream
 
-    def cleanup(self) -> None:
+            # Restituisci il contesto al pool dopo l'uso
+            with self.lock:
+                self.context_pool.put(context)
+
+    def cleanup(self):
         """
-        Libera tutte le risorse associate al TensorRTPredictor.
-        Questo metodo deve essere chiamato esplicitamente prima di eliminare l'oggetto.
+        Clean up all resources associated with the TensorRTPredictor.
+        This method should be called explicitly before deleting the object.
         """
-        # Libera l'engine TensorRT
+        # Pulisci l'engine TensorRT
         if hasattr(self, 'engine') and self.engine is not None:
-            del self.engine
-            self.engine = None
+            del self.engine  # Libera l'engine di TensorRT
+            self.engine = None  # Imposta a None per assicurarti che il GC lo raccolga
 
-        # Libera il pool di execution context e relativi buffer
+        # Pulisci il pool di contesti di esecuzione
         if hasattr(self, 'context_pool') and self.context_pool is not None:
             while not self.context_pool.empty():
-                pool_entry = self.context_pool.get()
-                context = pool_entry.get("context", None)
-                buffers = pool_entry.get("buffers", None)
-                if context is not None:
-                    del context
-                if buffers is not None:
-                    for t in buffers.values():
-                        del t
-            self.context_pool = None
+                context = self.context_pool.get()
+                del context  # Libera ogni contesto
+            self.context_pool = None  # Imposta a None per il GC
 
+        # Imposta gli attributi su None per garantire la pulizia
         self.inputs = None
         self.outputs = None
+        self.tensors = None
         self.pool_size = None
 
-    def __del__(self) -> None:
-        # Per maggiore sicurezza, chiama cleanup nel distruttore
+    def __del__(self):
+        # Richiama il metodo cleanup nel distruttore per maggiore sicurezza
         self.cleanup()

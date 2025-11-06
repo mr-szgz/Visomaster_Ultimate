@@ -2,24 +2,24 @@ from app.helpers.typing_helper import LayoutDictTypes
 import app.ui.widgets.actions.layout_actions as layout_actions
 
 COMMON_LAYOUT_DATA: LayoutDictTypes = {
-    # 'Face Compare':{
-    #     'ViewFaceMaskEnableToggle':{
-    #         'level': 1,
-    #         'label': 'View Face Mask',
-    #         'default': False,
-    #         'help': 'Show Face Mask',
-    #         'exec_function': layout_actions.fit_image_to_view_onchange,
-    #         'exec_function_args': [],
-    #     },
-    #     'ViewFaceCompareEnableToggle':{
-    #         'level': 1,
-    #         'label': 'View Face Compare',
-    #         'default': False,
-    #         'help': 'Show Face Compare',
-    #         'exec_function': layout_actions.fit_image_to_view_onchange,
-    #         'exec_function_args': [],
-    #     },
-    # },
+    'Face Compare':{
+        'ViewFaceMaskEnableToggle':{
+            'level': 1,
+            'label': 'View Face Mask',
+            'default': False,
+            'help': 'Show Face Mask',
+            'exec_function': layout_actions.fit_image_to_view_onchange,
+            'exec_function_args': [],
+        },
+        'ViewFaceCompareEnableToggle':{
+            'level': 1,
+            'label': 'View Face Compare',
+            'default': False,
+            'help': 'Show Face Compare',
+            'exec_function': layout_actions.fit_image_to_view_onchange,
+            'exec_function_args': [],
+        },
+    },
     'Face Restorer': {
         'FaceRestorerEnableToggle': {
             'level': 1,
@@ -40,7 +40,7 @@ COMMON_LAYOUT_DATA: LayoutDictTypes = {
             'level': 2,
             'label': 'Alignment',
             'options': ['Original', 'Blend', 'Reference'],
-            'default': 'Original',
+            'default': 'Reference',
             'parentToggle': 'FaceRestorerEnableToggle',
             'requiredToggleValue': True,
             'help': 'Select the alignment method for restoring the face to its original or blended position.'
@@ -182,7 +182,7 @@ COMMON_LAYOUT_DATA: LayoutDictTypes = {
             'default': '0.03',
             'decimals': 2,
             'step': 0.01,
-            'parentToggle': 'FaceExpressionNormalizeLipsEnableToggle & FaceExpressionEnableToggle',
+            'parentToggle': 'FaceExpressionNormalizeLipsEnableToggle|FaceExpressionEnableToggle',
             'requiredToggleValue': True,
             'help': 'Threshold value for Normalize Lips.'
         },
@@ -202,7 +202,7 @@ COMMON_LAYOUT_DATA: LayoutDictTypes = {
             'default': '1.00',
             'decimals': 2,
             'step': 0.01,
-            'parentToggle': 'FaceExpressionRetargetingEyesEnableToggle & FaceExpressionEnableToggle',
+            'parentToggle': 'FaceExpressionRetargetingEyesEnableToggle|FaceExpressionEnableToggle',
             'requiredToggleValue': True,
             'help': 'Multiplier value for Retargeting Eyes.'
         },
@@ -222,7 +222,7 @@ COMMON_LAYOUT_DATA: LayoutDictTypes = {
             'default': '1.00',
             'decimals': 2,
             'step': 0.01,
-            'parentToggle': 'FaceExpressionRetargetingLipsEnableToggle & FaceExpressionEnableToggle',
+            'parentToggle': 'FaceExpressionRetargetingLipsEnableToggle|FaceExpressionEnableToggle',
             'requiredToggleValue': True,
             'help': 'Multiplier value for Retargeting Lips.'
         },

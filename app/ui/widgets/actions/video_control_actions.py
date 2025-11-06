@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 import app.helpers.miscellaneous as misc_helpers
 from app.ui.widgets.actions import common_actions as common_widget_actions
 from app.ui.widgets.actions import graphics_view_actions
-import app.ui.widgets.actions.layout_actions as layout_actions
+
 
 def set_up_video_seek_line_edit(main_window: 'MainWindow'):
     video_processor = main_window.video_processor
@@ -209,11 +209,9 @@ def view_fullscreen(main_window: 'MainWindow'):
     main_window.is_full_screen = not main_window.is_full_screen
 
 def enable_zoom_and_pan(view: QtWidgets.QGraphicsView):
-    SCALE_FACTOR = 1.1
+    SCALE_FACTOR = 1.5
     view.zoom_value = 0  # Track zoom level
     view.last_scale_factor = 1.0  # Track the last scale factor (1.0 = no scaling)
-    view.is_panning = False  # Track whether panning is active
-    view.pan_start_pos = QtCore.QPoint()  # Store the initial mouse position for panning
 
     def zoom(self:QtWidgets.QGraphicsView, step=False):
         """Zoom in or out by a step."""
@@ -251,45 +249,10 @@ def enable_zoom_and_pan(view: QtWidgets.QGraphicsView):
                     view_rect.height() / scene_rect.height())
         self.scale(factor, factor)
 
-    def mousePressEvent(self: QtWidgets.QGraphicsView, event: QtGui.QMouseEvent):
-        """Handle mouse press event for panning."""
-        if event.button() == QtCore.Qt.MouseButton.RightButton:
-            self.is_panning = True
-            self.pan_start_pos = event.pos()  # Store the initial mouse position
-            self.setCursor(QtCore.Qt.ClosedHandCursor)  # Change cursor to indicate panning
-        else:
-            # Explicitly call the base class implementation
-            QtWidgets.QGraphicsView.mousePressEvent(self, event)
-
-    def mouseMoveEvent(self: QtWidgets.QGraphicsView, event: QtGui.QMouseEvent):
-        """Handle mouse move event for panning."""
-        if self.is_panning:
-            # Calculate the distance moved
-            delta = event.pos() - self.pan_start_pos
-            self.pan_start_pos = event.pos()  # Update the start position
-            # Translate the view
-            self.horizontalScrollBar().setValue(self.horizontalScrollBar().value() - delta.x())
-            self.verticalScrollBar().setValue(self.verticalScrollBar().value() - delta.y())
-        else:
-            # Explicitly call the base class implementation
-            QtWidgets.QGraphicsView.mouseMoveEvent(self, event)
-
-    def mouseReleaseEvent(self: QtWidgets.QGraphicsView, event: QtGui.QMouseEvent):
-        """Handle mouse release event for panning."""
-        if event.button() == QtCore.Qt.MouseButton.RightButton:
-            self.is_panning = False
-            self.setCursor(QtCore.Qt.ArrowCursor)  # Reset the cursor
-        else:
-            # Explicitly call the base class implementation
-            QtWidgets.QGraphicsView.mouseReleaseEvent(self, event)
-
     # Attach methods to the view
     view.zoom = partial(zoom, view)
     view.reset_zoom = partial(reset_zoom, view)
     view.wheelEvent = partial(wheelEvent, view)
-    view.mousePressEvent = partial(mousePressEvent, view)
-    view.mouseMoveEvent = partial(mouseMoveEvent, view)
-    view.mouseReleaseEvent = partial(mouseReleaseEvent, view)
 
     # view.zoom = zoom.__get__(view)
     # view.reset_zoom = reset_zoom.__get__(view)
@@ -335,7 +298,7 @@ def record_video(main_window: 'MainWindow', checked: bool):
             print("record_video: Video already playing. Stopping the current video before starting a new one.")
             video_processor.stop_processing()
             return
-        if not main_window.control.get('OutputMediaFolder','').strip():
+        if not main_window.outputFolderLineEdit.text():
             common_widget_actions.create_and_show_messagebox(main_window, 'No Output Folder Selected','Please select an Output folder to save the Videos before recording!', main_window)
             main_window.buttonMediaRecord.setChecked(False)
             return
@@ -414,8 +377,8 @@ def on_change_video_seek_slider(main_window: 'MainWindow', new_position=0):
         if ret:
             pixmap = common_widget_actions.get_pixmap_from_frame(main_window, frame)
             graphics_view_actions.update_graphics_view(main_window, pixmap, new_position)
-            if video_processor.current_frame_number == video_processor.max_frame_number:
-                video_processor.media_capture.set(cv2.CAP_PROP_POS_FRAMES, new_position)
+            # restore slider position 
+            video_processor.media_capture.set(cv2.CAP_PROP_POS_FRAMES, new_position)
             update_parameters_and_control_from_marker(main_window, new_position)
             update_widget_values_from_markers(main_window, new_position)
 
@@ -425,7 +388,7 @@ def on_change_video_seek_slider(main_window: 'MainWindow', new_position=0):
 def update_parameters_and_control_from_marker(main_window: 'MainWindow', new_position: int):
     if main_window.markers.get(new_position):
         main_window.parameters = copy.deepcopy(main_window.markers[new_position]['parameters'])
-        main_window.control.update(main_window.markers[new_position]['control'].copy())
+        main_window.control = main_window.markers[new_position]['control'].copy()
 
 def update_widget_values_from_markers(main_window: 'MainWindow', new_position: int):
     if main_window.markers.get(new_position):
@@ -462,23 +425,14 @@ def process_edit_faces(main_window: 'MainWindow'):
     video_processor = main_window.video_processor
     video_processor.process_current_frame()
 
-def process_compare_checkboxes(main_window: 'MainWindow'):
-    main_window.video_processor.process_current_frame()
-    layout_actions.fit_image_to_view_onchange(main_window)
 
 def save_current_frame_to_file(main_window: 'MainWindow'):
-    if not main_window.outputFolderLineEdit.text():
-        common_widget_actions.create_and_show_messagebox(main_window, 'No Output Folder Selected','Please select an Output folder to save the Images/Videos before Saving/Recording!', main_window)
-        return
     frame = main_window.video_processor.current_frame.copy()
     if isinstance(frame, numpy.ndarray):
-        # save_filename, _ = os.path.splitext(main_window.video_processor.media_path)
-        # save_filename, _ = QtWidgets.QFileDialog.getSaveFileName(main_window, 'Save Frame as Image', f'{save_filename}.png', filter='PNG (*.png)',)
-        save_filename = misc_helpers.get_output_file_path(main_window.video_processor.media_path, main_window.control['OutputMediaFolder'], media_type='image')
+        save_filename, _ = os.path.splitext(main_window.video_processor.media_path)
+        save_filename, _ = QtWidgets.QFileDialog.getSaveFileName(main_window, 'Save Frame as Image', f'{save_filename}.png', filter='PNG (*.png)',)
         if save_filename:
             pil_image = Image.fromarray(frame[..., ::-1])
             pil_image.save(save_filename, 'PNG')
-            common_widget_actions.create_and_show_toast_message(main_window, 'Image Saved', f'Saved Current Image to file: {save_filename}')
-
     else:
         common_widget_actions.create_and_show_messagebox(main_window, 'Invalid Frame', 'Cannot save the current frame!', parent_widget=main_window.saveImageButton)

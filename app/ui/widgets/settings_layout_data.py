@@ -8,7 +8,7 @@ SETTINGS_LAYOUT_DATA: LayoutDictTypes = {
             'label': 'Theme',
             'options': ['Dark', 'Dark-Blue', 'Light'],
             'default': 'Dark',
-            'help': 'Select the theme to be used',
+            'help': 'Select the providers priority to be used with the system.',
             'exec_function': control_actions.change_theme,
             'exec_function_args': [],
         },
@@ -19,7 +19,7 @@ SETTINGS_LAYOUT_DATA: LayoutDictTypes = {
             'label': 'Providers Priority',
             'options': ['CUDA', 'TensorRT', 'TensorRT-Engine', 'CPU'],
             'default': 'CUDA',
-            'help': 'Select the providers priority to be used with the system.',
+            'help': 'Select the theme to be used',
             'exec_function': control_actions.change_execution_provider,
             'exec_function_args': [],
         },
@@ -201,11 +201,19 @@ SETTINGS_LAYOUT_DATA: LayoutDictTypes = {
         },
     },
     'Webcam Settings': {
+        'WebcamEnableToggle': {
+            'level': 1,
+            'label': 'Enable Webcam',
+            'default': False,
+            'help': 'Enable the use of the webcam as the input source for face swapping.',
+        },
         'WebcamMaxNoSelection': {
             'level': 2,
             'label': 'Webcam Max No',
             'options': ['1', '2', '3', '4', '5', '6'],
             'default': '1',
+            'parentToggle': 'WebcamEnableToggle',
+            'requiredToggleValue': True,
             'help': 'Select the maximum number of webcam streams to allow for face swapping.'
         },
         'WebcamBackendSelection': {
@@ -213,6 +221,8 @@ SETTINGS_LAYOUT_DATA: LayoutDictTypes = {
             'label': 'Webcam Backend',
             'options': ['Default', 'DirectShow', 'MSMF', 'V4L', 'V4L2', 'GSTREAMER'],
             'default': 'Default',
+            'parentToggle': 'WebcamEnableToggle',
+            'requiredToggleValue': True,
             'help': 'Choose the backend for accessing webcam input.'
         },
         'WebcamMaxResSelection': {
@@ -220,6 +230,8 @@ SETTINGS_LAYOUT_DATA: LayoutDictTypes = {
             'label': 'Webcam Resolution',
             'options': ['480x360', '640x480', '1280x720', '1920x1080', '2560x1440', '3840x2160'],
             'default': '1280x720',
+            'parentToggle': 'WebcamEnableToggle',
+            'requiredToggleValue': True,
             'help': 'Select the maximum resolution for webcam input.'
         },
         'WebCamMaxFPSSelection': {
@@ -227,28 +239,9 @@ SETTINGS_LAYOUT_DATA: LayoutDictTypes = {
             'label': 'Webcam FPS',
             'options': ['23', '30', '60'],
             'default': '30',
-            'help': 'Set the maximum frames per second (FPS) for webcam input.'
-        },
-    },
-    'Virtual Camera': {
-        'SendVirtCamFramesEnableToggle': {
-            'level': 1,
-            'label': 'Send Frames to Virtual Camera',
-            'default': False,
-            'help': 'Send the swapped video/webcam output to virtual camera for using in external applications',
-            'exec_function': control_actions.toggle_virtualcam,
-            'exec_function_args': [],
-        },
-        'VirtCamBackendSelection': {
-            'level': 1,
-            'label': 'Virtual Camera Backend',
-            'options': ['obs', 'unitycapture'],
-            'default': 'obs',
-            'help': 'Choose the backend based on the Virtual Camera you have set up',
-            'parentToggle': 'SendVirtCamFramesEnableToggle',
+            'parentToggle': 'WebcamEnableToggle',
             'requiredToggleValue': True,
-            'exec_function': control_actions.enable_virtualcam,
-            'exec_funtion_args': [],
+            'help': 'Set the maximum frames per second (FPS) for webcam input.'
         },
     },
     'Face Recognition': {

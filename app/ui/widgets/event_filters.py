@@ -64,13 +64,6 @@ class VideoSeekSliderEventFilter(QtCore.QObject):
                 QtCore.QTimer.singleShot(0, self.main_window.video_processor.process_current_frame)
                 
                 return result  # Return the result of the default handling
-        elif event.type() == QtCore.QEvent.Type.Wheel:
-            # Allow default slider movement
-            result = super().eventFilter(slider, event)
-            
-            # After the slider moves, call the custom processing function
-            QtCore.QTimer.singleShot(0, self.main_window.video_processor.process_current_frame)
-            return result
 
         # For other events, use the default behavior
         return super().eventFilter(slider, event)
@@ -86,7 +79,7 @@ class ListWidgetEventFilter(QtCore.QObject):
 
             if event.type() == QtCore.QEvent.Type.MouseButtonPress:
                 if event.button() == QtCore.Qt.MouseButton.LeftButton and not self.main_window.target_videos:
-                    list_view_actions.select_target_medias(self.main_window, 'folder')
+                    self.main_window.actionOpen_Videos_Folder.trigger()
 
             elif event.type() == QtCore.QEvent.Type.DragEnter:
                 # Accept drag events with URLs
@@ -121,7 +114,7 @@ class ListWidgetEventFilter(QtCore.QObject):
 
             if event.type() == QtCore.QEvent.Type.MouseButtonPress:
                 if event.button() == QtCore.Qt.MouseButton.LeftButton and not self.main_window.input_faces:
-                    list_view_actions.select_input_face_images(self.main_window, 'folder')
+                    self.main_window.actionLoad_Source_Images_Folder.trigger()
 
             elif event.type() == QtCore.QEvent.Type.DragEnter:
                 # Accept drag events with URLs

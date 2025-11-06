@@ -43,7 +43,7 @@ def change_theme(main_window: 'MainWindow', new_theme):
         _style = get_style_data('light_styles.qss', 'light',)
 
     elif new_theme == "Dark-Blue":
-        _style = get_style_data('dark_styles.qss', 'dark',) + qdarkstyle.load_stylesheet() # Applica lo stile dark-blue 
+        _style = qdarkstyle.load_stylesheet() # Applica lo stile dark-blue 
 
     app.setStyleSheet(_style)
 
@@ -53,14 +53,3 @@ def set_video_playback_fps(main_window: 'MainWindow', set_video_fps=False):
     # print("Called set_video_playback_fps()")
     if set_video_fps and main_window.video_processor.media_capture:
         main_window.parameter_widgets['VideoPlaybackCustomFpsSlider'].set_value(main_window.video_processor.fps)
-
-def toggle_virtualcam(main_window: 'MainWindow', toggle_value=False):
-    video_processor = main_window.video_processor
-    if toggle_value:
-        video_processor.enable_virtualcam()
-    else:
-        video_processor.disable_virtualcam()
-
-def enable_virtualcam(main_window: 'MainWindow', backend):
-    print('backend', backend)
-    main_window.video_processor.enable_virtualcam(backend=backend)

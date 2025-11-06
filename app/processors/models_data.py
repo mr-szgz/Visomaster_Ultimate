@@ -51,23 +51,6 @@ arcface_mapping_model_dict = {
     'CSCS': 'CSCSArcFace',
 }
 
-detection_model_mapping = {
-    'RetinaFace': 'RetinaFace',
-    'SCRFD': 'SCRFD2.5g',
-    'Yolov8': 'YoloFace8n',
-    'Yunet': 'YunetN',
-}
-
-landmark_model_mapping = {
-    '5': 'FaceLandmark5',
-    '68': 'FaceLandmark68',
-    '3d68': 'FaceLandmark3d68',
-    '98': 'FaceLandmark98',
-    '106': 'FaceLandmark106',
-    '203': 'FaceLandmark203',
-    '478': 'FaceLandmark478',
-}
-
 
 
 models_list = [
@@ -412,12 +395,6 @@ models_list = [
         "hash": "5b805bba7b5660ab7070b5a381dcf75e5b3e04199f1e9387232a77a00095102e",
         "url": f"{assets_repo}/v0.1.0/faceparser_resnet34.onnx"
 
-    },
-    {
-        "model_name": "RD64ClipText",
-        "local_path": f"{models_dir}/rd64-uni-refined.pth",
-        "hash": "a4956f9a7978a75630b08c9d6ec075b7c51cf43b4751b686e3a011d4012ddc9d",
-        "url": f"{assets_repo}/v0.1.0/rd64-uni-refined.pth",
     },
     {
         "model_name": "LivePortraitMotionExtractor",

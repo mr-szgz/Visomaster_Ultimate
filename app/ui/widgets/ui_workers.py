@@ -10,7 +10,6 @@ import numpy
 from PySide6 import QtCore as qtc
 from PySide6.QtGui import QPixmap
 
-from app.processors.models_data import detection_model_mapping, landmark_model_mapping
 from app.helpers import miscellaneous as misc_helpers
 from app.ui.widgets.actions import common_actions as common_widget_actions
 from app.ui.widgets.actions import filter_actions
@@ -33,9 +32,6 @@ class TargetMediaLoaderWorker(qtc.QThread):
         self.media_ids = media_ids or []
         self.webcam_mode = webcam_mode
         self._running = True  # Flag to control the running state
-        
-        # Ensure thumbnail directory exists
-        misc_helpers.ensure_thumbnail_dir()
 
     def run(self):
         if self.folder_name:
@@ -126,8 +122,8 @@ class InputFacesLoaderWorker(qtc.QThread):
         
     def pre_load_detection_recognition_models(self):
         control = self.main_window.control.copy()
-        detect_model = detection_model_mapping[control['DetectorModelSelection']]
-        landmark_detect_model = landmark_model_mapping[control['LandmarkDetectModelSelection']]
+        detect_model = control['DetectorModelSelection']
+        landmark_detect_model = f"FaceLandmark{control['LandmarkDetectModelSelection']}"
         models_processor = self.main_window.models_processor
         if self.main_window.video_processor.processing:
             was_playing = True
@@ -136,7 +132,7 @@ class InputFacesLoaderWorker(qtc.QThread):
             was_playing = False
         if not models_processor.models[detect_model]:
             models_processor.models[detect_model] = models_processor.load_model(detect_model)
-        if not models_processor.models[landmark_detect_model] and control['LandmarkDetectToggle']:
+        if not models_processor.models[landmark_detect_model]:
             models_processor.models[landmark_detect_model] = models_processor.load_model(landmark_detect_model)
         for recognition_model in ['Inswapper128ArcFace', 'SimSwapArcFace', 'GhostArcFace', 'CSCSArcFace', 'CSCSIDArcFace']:
             if not models_processor.models[recognition_model]:
@@ -168,7 +164,7 @@ class InputFacesLoaderWorker(qtc.QThread):
                 return
             if folder_name:
                 image_file_path = os.path.join(folder_name, image_file_path)
-            frame = misc_helpers.read_image_file(image_file_path)
+            frame = cv2.imread(image_file_path)
             if frame is None:
                 continue
             # Frame must be in RGB format

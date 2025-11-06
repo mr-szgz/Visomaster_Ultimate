@@ -1,7 +1,6 @@
 from typing import Dict
 from pathlib import Path
 from functools import partial
-import copy
 
 from PySide6 import QtWidgets, QtGui
 from PySide6 import QtCore
@@ -25,8 +24,8 @@ from app.ui.widgets.common_layout_data import COMMON_LAYOUT_DATA
 from app.ui.widgets.swapper_layout_data import SWAPPER_LAYOUT_DATA
 from app.ui.widgets.settings_layout_data import SETTINGS_LAYOUT_DATA
 from app.ui.widgets.face_editor_layout_data import FACE_EDITOR_LAYOUT_DATA
-from app.helpers.miscellaneous import DFM_MODELS_DATA, ParametersDict
-from app.helpers.typing_helper import FacesParametersTypes, ParametersTypes, ControlTypes, MarkerTypes
+from app.helpers.miscellaneous import DFM_MODELS_DATA
+from app.helpers.typing_helper import ParametersTypes, ControlTypes
 
 ParametersWidgetTypes = Dict[str, widget_components.ToggleButton|widget_components.SelectionBox|widget_components.ParameterDecimalSlider|widget_components.ParameterSlider|widget_components.ParameterText]
 
@@ -62,21 +61,18 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
                 # -----
             # }
         # '''
-        self.parameters: FacesParametersTypes = {} 
+        self.parameters: ParametersTypes = {} 
 
-        self.default_parameters: ParametersTypes = {}
-        self.copied_parameters: ParametersTypes = {}
-        self.current_widget_parameters: ParametersTypes = {}
+        self.default_parameters: Dict[str, bool|int|float|str] = {}
+        self.copied_parameters: Dict[str, bool|int|float|str] = {}
+        self.current_widget_parameters: Dict[str, bool|int|float|str] = {}
 
-        self.markers: MarkerTypes = {} #Video Markers (Contains parameters for each face)
+        self.markers: Dict[int, Dict[ParametersTypes, ControlTypes]] = {} #Video Markers (Contains parameters for each face)
         self.parameters_list = {}
         self.control: ControlTypes = {}
         self.parameter_widgets: ParametersWidgetTypes = {}
         self.loaded_embedding_filename: str = ''
         
-        self.last_target_media_folder_path = ''
-        self.last_input_media_folder_path = ''
-
         self.is_full_screen = False
         self.dfm_models_data = DFM_MODELS_DATA
         # This flag is used to make sure new loaded media is properly fit into the graphics frame on the first load
@@ -115,10 +111,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.targetVideosList.viewport().installEventFilter(list_widget_event_filter)
         self.inputFacesList.installEventFilter(list_widget_event_filter)
         self.inputFacesList.viewport().installEventFilter(list_widget_event_filter)
-
-        # Set up folder open buttons for Target and Input
-        self.buttonTargetVideosPath.clicked.connect(partial(list_view_actions.select_target_medias, self, 'folder'))
-        self.buttonInputFacesPath.clicked.connect(partial(list_view_actions.select_input_face_images, self, 'folder'))
 
         # Initialize graphics frame to view frames
         self.scene = QtWidgets.QGraphicsScene()
@@ -177,9 +169,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.facesPanelCheckBox.toggled.connect(partial(layout_actions.show_hide_faces_panel, self))
         self.mediaPanelCheckBox.toggled.connect(partial(layout_actions.show_hide_input_target_media_panel, self))
 
-        self.faceMaskCheckBox.clicked.connect(partial(video_control_actions.process_compare_checkboxes, self))
-        self.faceCompareCheckBox.clicked.connect(partial(video_control_actions.process_compare_checkboxes, self))
-
         layout_actions.add_widgets_to_tab_layout(self, LAYOUT_DATA=COMMON_LAYOUT_DATA, layoutWidget=self.commonWidgetsLayout, data_type='parameter')
         layout_actions.add_widgets_to_tab_layout(self, LAYOUT_DATA=SWAPPER_LAYOUT_DATA, layoutWidget=self.swapWidgetsLayout, data_type='parameter')
         layout_actions.add_widgets_to_tab_layout(self, LAYOUT_DATA=SETTINGS_LAYOUT_DATA, layoutWidget=self.settingsWidgetsLayout, data_type='control')
@@ -189,9 +178,6 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
         self.outputFolderButton.clicked.connect(partial(list_view_actions.select_output_media_folder, self))
         # Create a control value for OutputMediaFolder
         common_widget_actions.create_control(self, 'OutputMediaFolder', '')
-
-        # Initialize current_widget_parameters with default values
-        self.current_widget_parameters = ParametersDict(copy.deepcopy(self.default_parameters), self.default_parameters)
 
         # Initialize the button states
         video_control_actions.reset_media_buttons(self)
@@ -223,34 +209,9 @@ class MainWindow(QtWidgets.QMainWindow, Ui_MainWindow):
             graphics_view_actions.fit_image_to_view(self, pixmap_item, scene_rect )
 
     def keyPressEvent(self, event):
-        match event.key():
-            case QtCore.Qt.Key_F11:
-                video_control_actions.view_fullscreen(self)
-            case QtCore.Qt.Key_V:
-                video_control_actions.advance_video_slider_by_n_frames(self, n=1)
-            case QtCore.Qt.Key_C:
-                video_control_actions.rewind_video_slider_by_n_frames(self, n=1)
-            case QtCore.Qt.Key_D:
-                video_control_actions.advance_video_slider_by_n_frames(self, n=30)
-            case QtCore.Qt.Key_A:
-                video_control_actions.rewind_video_slider_by_n_frames(self, n=30)
-            case QtCore.Qt.Key_Z:
-                self.videoSeekSlider.setValue(0)
-            case QtCore.Qt.Key_Space:
-                self.buttonMediaPlay.click()
-            case QtCore.Qt.Key_R:
-                self.buttonMediaRecord.click()
-            case QtCore.Qt.Key_F:
-                if event.modifiers() & QtCore.Qt.KeyboardModifier.AltModifier:
-                    video_control_actions.remove_video_slider_marker(self)
-                else:
-                    video_control_actions.add_video_slider_marker(self)
-            case QtCore.Qt.Key_W:
-                video_control_actions.move_slider_to_nearest_marker(self, 'next')
-            case QtCore.Qt.Key_Q:
-                video_control_actions.move_slider_to_nearest_marker(self, 'previous')
-            case QtCore.Qt.Key_S:
-                self.swapfacesButton.click()
+        # Toggle full screen when F11 is pressed
+        if event.key() == QtCore.Qt.Key_F11:
+            video_control_actions.view_fullscreen(self)
 
     def closeEvent(self, event):
         print("MainWindow: closeEvent called.")
