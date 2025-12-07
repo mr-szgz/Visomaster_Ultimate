@@ -35,3 +35,6 @@ dependencies/TensorRT/
 *.jpg
 *.exe
 .thumbnails
+
+*.lnk
+*_new.bat
