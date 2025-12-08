@@ -26,6 +26,8 @@ def open_embeddings_from_file(main_window: 'MainWindow'):
     if embedding_filename:
         with open(embedding_filename, 'r') as embed_file: #pylint: disable=unspecified-encoding
             embeddings_list = json.load(embed_file)
+            
+            # Use the robust clear function
             card_actions.clear_merged_embeddings(main_window)
 
             # Reset per ogni target face
@@ -47,6 +49,13 @@ def open_embeddings_from_file(main_window: 'MainWindow'):
                     embedding_store,  # Passa l'intero embedding_store
                     embedding_id=str(uuid.uuid1().int)
                 )
+
+        # After loading, this new order is the "unsorted" ground truth.
+        main_window.unsorted_embedding_ids = list(main_window.merged_embeddings.keys())
+        
+        # Now, apply the current sort mode to the newly loaded data.
+        if main_window.embedding_sort_mode != "Off":
+            reorder_embeddings_from_data(main_window, main_window.embedding_sort_mode)
 
     main_window.loaded_embedding_filename = embedding_filename or main_window.loaded_embedding_filename
 
@@ -79,6 +88,44 @@ def save_embeddings_to_file(main_window: 'MainWindow', save_as=False):
             common_widget_actions.create_and_show_toast_message(main_window, 'Embeddings Saved', f'Saved Embeddings to file: {embedding_filename}')
 
         main_window.loaded_embedding_filename = embedding_filename
+
+def reorder_embeddings_from_data(main_window: 'MainWindow', sort_mode: str):
+    """
+    Reorders embeddings by clearing and re-populating the list from a sorted
+    list of the data widgets. This is the safe, data-driven approach.
+    """
+    if not main_window.merged_embeddings:
+        return
+
+    # 1. Get the list of all button widgets from the master dictionary.
+    all_buttons = list(main_window.merged_embeddings.values())
+    ordered_buttons = []
+
+    # 2. Sort this list of widgets based on the desired mode.
+    if sort_mode == "Off":
+        if hasattr(main_window, 'unsorted_embedding_ids') and main_window.unsorted_embedding_ids:
+            # Create a map for quick lookup and then build the sorted list
+            id_to_button_map = {btn.embedding_id: btn for btn in all_buttons}
+            ordered_buttons = [id_to_button_map[embed_id] for embed_id in main_window.unsorted_embedding_ids if embed_id in id_to_button_map]
+        else:
+            # If there's no backup, the current order is the "Off" order.
+            ordered_buttons = all_buttons
+    else:  # "A-Z" or "Z-A"
+        is_reverse = (sort_mode == "Z-A")
+        all_buttons.sort(key=lambda btn: btn.embedding_name.lower(), reverse=is_reverse)
+        ordered_buttons = all_buttons
+
+    # 3. Completely clear the current state. This is the crucial step to avoid C++ errors.
+    card_actions.clear_merged_embeddings(main_window)
+
+    # 4. Re-populate the list from the sorted widget data.
+    for button in ordered_buttons:
+        list_view_actions.create_and_add_embed_button_to_list(
+            main_window=main_window,
+            embedding_name=button.embedding_name,
+            embedding_store=button.embedding_store,
+            embedding_id=button.embedding_id
+        )
 
 # This method is used to convert the data type of Parameters Dict
 # Parameters are converted to dict when serializing to JSON
@@ -172,6 +219,10 @@ def load_saved_workspace(main_window: 'MainWindow', data_filename: str|bool = Fa
                 embedding_store = {embed_model: np.array(embedding) for embed_model, embedding in embedding_data['embedding_store'].items()}
                 embedding_name = embedding_data['embedding_name']
                 list_view_actions.create_and_add_embed_button_to_list(main_window, embedding_name, embedding_store, embedding_id=embedding_id)
+            
+            main_window.unsorted_embedding_ids = list(main_window.merged_embeddings.keys())
+            if main_window.embedding_sort_mode != "Off":
+                reorder_embeddings_from_data(main_window, main_window.embedding_sort_mode)
 
             # Add target_faces
             for face_id, target_face_data in data['target_faces_data'].items():

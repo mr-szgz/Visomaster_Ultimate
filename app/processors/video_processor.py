@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 import gc
 from functools import partial
+from datetime import datetime
 
 import cv2
 import numpy
@@ -79,18 +80,18 @@ class VideoProcessor(QObject):
 
         self.single_frame_processed_signal.connect(self.display_current_frame)
 
-    Slot(int, QPixmap, numpy.ndarray)
+    @Slot(int, QPixmap, numpy.ndarray)
     def store_frame_to_display(self, frame_number, pixmap, frame):
         # print("Called store_frame_to_display()")
         self.frames_to_display[frame_number] = (pixmap, frame)
 
     # Use a queue to store the webcam frames, since the order of frames is not that important (Unless there are too many threads)
-    Slot(QPixmap, numpy.ndarray)
+    @Slot(QPixmap, numpy.ndarray)
     def store_webcam_frame_to_display(self, pixmap, frame):
         # print("Called store_webcam_frame_to_display()")
         self.webcam_frames_to_display.put((pixmap, frame))
 
-    Slot(int, QPixmap, numpy.ndarray)
+    @Slot(int, QPixmap, numpy.ndarray)
     def display_current_frame(self, frame_number, pixmap, frame):
         if self.main_window.loading_new_media:
             graphics_view_actions.update_graphics_view(self.main_window, pixmap, frame_number, reset_fit=True)
@@ -354,21 +355,64 @@ class VideoProcessor(QObject):
 
             if self.file_type=='video':
                 if self.recording:
-                    final_file_path = misc_helpers.get_output_file_path(self.media_path, self.main_window.control['OutputMediaFolder'])
+                    # === 新增：決定輸出基底資料夾 ===
+                    output_to_target = self.main_window.control.get('OutputToTargetLocationToggle', False)
+                    if output_to_target and self.media_path:
+                        base_output_folder = os.path.dirname(self.media_path)
+                    else:
+                        base_output_folder = self.main_window.control['OutputMediaFolder']
+
+                    # === 新增：抓目前來源名稱（merged embedding 優先，否則 input face 檔名）===
+                    def _sanitize(name: str) -> str:
+                        return "".join([c for c in name if c.isalnum() or c in "._-"]).rstrip()
+
+                    source_name = None
+                    tf_btn = getattr(self.main_window, "cur_selected_target_face_button", None)
+                    if tf_btn and getattr(tf_btn, "assigned_merged_embeddings", None):
+                        emb_id = next(iter(tf_btn.assigned_merged_embeddings.keys()), None)
+                        if emb_id and emb_id in self.main_window.merged_embeddings:
+                            emb_btn = self.main_window.merged_embeddings[emb_id]
+                            nm = getattr(emb_btn, "embedding_name", None)
+                            if nm:
+                                source_name = _sanitize(nm)
+                    if not source_name and tf_btn and getattr(tf_btn, "assigned_input_faces", None):
+                        face_id = next(iter(tf_btn.assigned_input_faces.keys()), None)
+                        if face_id and face_id in self.main_window.input_faces:
+                            face_btn = self.main_window.input_faces[face_id]
+                            base = os.path.splitext(os.path.basename(face_btn.media_path))[0]
+                            source_name = _sanitize(base)
+
+                    # === FIX: Check 'ClusterOutputBySourceToggle' setting before creating a subfolder ===
+                    output_folder = base_output_folder
+                    if self.main_window.control.get('ClusterOutputBySourceToggle', True) and source_name:
+                        output_folder = os.path.join(base_output_folder, source_name)
+                    os.makedirs(output_folder, exist_ok=True)
+
+                    # 原本的命名規則不動，只是把 folder 換成 output_folder
+                    final_file_path = misc_helpers.get_output_file_path(self.media_path, output_folder)
                     if Path(final_file_path).is_file():
                         os.remove(final_file_path)
+
+                    print(f"[video-save] base_output_folder={base_output_folder}")
+                    print(f"[video-save] source_name={source_name}")
+                    print(f"[video-save] output_folder={output_folder}")
+                    print(f"[video-save] temp_file={self.temp_file}")
+                    print(f"[video-save] final_file_path={final_file_path}")
                     print("Adding audio...")
+
                     args = ["ffmpeg",
                             '-hide_banner',
-                            '-loglevel',    'error',
+                            '-loglevel', 'error',
                             "-i", self.temp_file,
                             "-ss", str(self.play_start_time), "-to", str(self.play_end_time), "-i",  self.media_path,
-                            "-c",  "copy", # may be c:v
+                            "-c",  "copy",  # 保持你的原本流程
                             "-map", "0:v:0", "-map", "1:a:0?",
                             "-shortest",
                             final_file_path]
-                    subprocess.run(args, check=False) #Add Audio
+                    subprocess.run(args, check=False)  # Add Audio
+
                     os.remove(self.temp_file)
+
 
                 self.end_time = time.perf_counter()
                 processing_time = self.end_time - self.start_time
@@ -399,8 +443,9 @@ class VideoProcessor(QObject):
     def create_ffmpeg_subprocess(self):
         # Use Dimensions of the last processed frame as it could be different from the original frame due to restorers and frame enhancers 
         frame_height, frame_width, _ = self.current_frame.shape
-
-        self.temp_file = r'temp_output.mp4'
+        date_and_time = datetime.now().strftime(r'%Y_%m_%d_%H_%M_%S')
+        self.temp_file = f'temp_output_{date_and_time}.mp4'
+        #output_filename = f'{temp_path.stem}_{date_and_time}.mp4'
         if Path(self.temp_file).is_file():
             os.remove(self.temp_file)
 

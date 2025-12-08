@@ -64,6 +64,58 @@ SETTINGS_LAYOUT_DATA: LayoutDictTypes = {
             'help': 'Automatically Swap all faces using selected Source Faces/Embeddings when loading an video/image file'
         },
     },
+    'Batch Processing': {
+        'ClipboardMonitorToggle': {
+            'level': 1,
+            'label': 'Monitor Clipboard for Files',
+            'default': False,
+            'help': 'Automatically add image/video files from the clipboard to the target list.',
+            'exec_function': control_actions.toggle_clipboard_monitoring,
+            'exec_function_args': [],
+        },
+        'AutoProcessTargetToggle': {
+            'level': 1,
+            'label': 'Auto Process New Target Files',
+            'default': False,
+            'help': 'Automatically start batch processing when new files are added to the target list.',
+        },
+        # 'AutoBatchSaveFrameToggle': {
+            # 'level': 1,
+            # 'label': 'Auto Batch Save Single Frame',
+            # 'default': False,
+            # 'help': 'When "Monitor Clipboard" is active, automatically processes the first frame of new files against all embeddings.'
+        # },
+        'OutputToTargetLocationToggle': {
+            'level': 1,
+            'label': 'Output to Target Location',
+            'default': False,
+            'help': 'If checked, saves processed files in the same folder as their original target file, ignoring the main Output Directory.',
+        },
+        'ClusterOutputBySourceToggle': {
+            'level': 1,
+            'label': 'Cluster Output by Source Name',
+            'default': True,
+            'help': 'When enabled, saves output images/videos into subdirectories named after the source face/embedding.'
+        },
+        'ProcessForEachSourceImageToggle': {
+            'level': 1,
+            'label': 'For each Source Image',
+            'default': False,
+            'help': 'When batch processing, create an output for each source image in the list.',
+        },
+        'ProcessForEachEmbeddingToggle': {
+            'level': 1,
+            'label': 'For each Merged Embedding',
+            'default': False,
+            'help': 'When batch processing, create an output for each merged embedding in the list.',
+        },
+        'ClearTargetAfterProcessingToggle': {
+            'level': 1,
+            'label': 'Clear Target Files After Processing',
+            'default': False,
+            'help': 'Automatically clear the target files list after batch processing is complete.',
+        },
+    },
     'Detectors': {
         'DetectorModelSelection': {
             'level': 1,

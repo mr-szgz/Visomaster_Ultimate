@@ -467,18 +467,377 @@ def process_compare_checkboxes(main_window: 'MainWindow'):
     layout_actions.fit_image_to_view_onchange(main_window)
 
 def save_current_frame_to_file(main_window: 'MainWindow'):
-    if not main_window.outputFolderLineEdit.text():
-        common_widget_actions.create_and_show_messagebox(main_window, 'No Output Folder Selected','Please select an Output folder to save the Images/Videos before Saving/Recording!', main_window)
-        return
-    frame = main_window.video_processor.current_frame.copy()
-    if isinstance(frame, numpy.ndarray):
-        # save_filename, _ = os.path.splitext(main_window.video_processor.media_path)
-        # save_filename, _ = QtWidgets.QFileDialog.getSaveFileName(main_window, 'Save Frame as Image', f'{save_filename}.png', filter='PNG (*.png)',)
-        save_filename = misc_helpers.get_output_file_path(main_window.video_processor.media_path, main_window.control['OutputMediaFolder'], media_type='image')
-        if save_filename:
-            pil_image = Image.fromarray(frame[..., ::-1])
-            pil_image.save(save_filename, 'PNG')
-            common_widget_actions.create_and_show_toast_message(main_window, 'Image Saved', f'Saved Current Image to file: {save_filename}')
+    """
+    存『目前畫面』為一張圖片（JPEG）。
+    會自動依目前使用的來源 name（embedding 或 input face）在輸出資料夾下建立子資料夾。
+    """
+    def _sanitize(name: str) -> str:
+        return "".join([c for c in name if c.isalnum() or c in "._-"]).rstrip()
 
+    def _get_active_source_name() -> str | None:
+        """
+        來源優先序：
+        1) 目前 target face 所指派的 merged embeddings（若>1，取第一個）
+        2) 目前 target face 所指派的 input faces（若>1，取第一個；用檔名 stem 當 name）
+        """
+        tf_btn = main_window.cur_selected_target_face_button
+        if not tf_btn:
+            return None
+
+        # 1) merged embeddings
+        if getattr(tf_btn, "assigned_merged_embeddings", None):
+            # 取第一個 id
+            emb_id = next(iter(tf_btn.assigned_merged_embeddings.keys()), None)
+            if emb_id and emb_id in main_window.merged_embeddings:
+                emb_btn = main_window.merged_embeddings[emb_id]
+                name = getattr(emb_btn, "embedding_name", None)
+                if name:
+                    return _sanitize(name)
+
+        # 2) input faces
+        if getattr(tf_btn, "assigned_input_faces", None):
+            face_id = next(iter(tf_btn.assigned_input_faces.keys()), None)
+            if face_id and face_id in main_window.input_faces:
+                face_btn = main_window.input_faces[face_id]
+                base = os.path.splitext(os.path.basename(face_btn.media_path))[0]
+                return _sanitize(base)
+
+        return None
+
+    # 先決定「基底輸出資料夾」
+    output_to_target = main_window.control.get('OutputToTargetLocationToggle', False)
+    if output_to_target:
+        if main_window.selected_video_button and main_window.selected_video_button.media_path:
+            base_output_folder = os.path.dirname(main_window.selected_video_button.media_path)
+        else:
+            common_widget_actions.create_and_show_messagebox(
+                main_window, 'No target media selected',
+                'No target media selected to determine output path.', main_window
+            )
+            return
     else:
-        common_widget_actions.create_and_show_messagebox(main_window, 'Invalid Frame', 'Cannot save the current frame!', parent_widget=main_window.saveImageButton)
+        base_output_folder = main_window.outputFolderLineEdit.text()
+
+    if not base_output_folder:
+        common_widget_actions.create_and_show_messagebox(
+            main_window, 'No Output Folder Selected',
+            'Please select an Output folder in Settings, or enable "Output to Target Location".', main_window
+        )
+        return
+
+    # 取得目前 frame
+    frame = main_window.video_processor.current_frame.copy()
+    if not isinstance(frame, numpy.ndarray):
+        common_widget_actions.create_and_show_messagebox(
+            main_window, 'No Frame Available', 'Cannot access the current frame!',
+            parent_widget=main_window.saveImageButton
+        )
+        return
+
+    # 依來源 name 建立子資料夾
+    source_name = _get_active_source_name()
+    output_folder = base_output_folder
+    cluster_by_source = main_window.control.get('ClusterOutputBySourceToggle', True)
+    if cluster_by_source and source_name:
+        output_folder = os.path.join(base_output_folder, source_name)
+
+    try:
+        os.makedirs(output_folder, exist_ok=True)
+    except Exception as e:
+        common_widget_actions.create_and_show_messagebox(
+            main_window, 'Create Folder Failed',
+            f'Failed to create folder:\n{output_folder}\n{e}',
+            parent_widget=main_window.saveImageButton
+        )
+        return
+
+    # 用 helper 先拿到原本規則的「基礎檔名」，再加前綴時間＋結尾亂碼，避免重名覆蓋
+    tmp = misc_helpers.get_output_file_path(
+        main_window.video_processor.media_path, output_folder, media_type='image'
+    )
+    base_noext, _ = os.path.splitext(tmp)
+    stem = os.path.basename(base_noext)      # 原本檔名主體
+    if cluster_by_source and source_name:
+        stem = f"{stem}_{source_name}"
+
+    dir_ = os.path.dirname(base_noext)
+    import datetime, secrets, string
+    ts = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    rand = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(6))
+
+    save_filename = os.path.join(dir_, f"{ts}_{stem}_{rand}.jpg")
+
+    # Debug
+    print(f"[save_image] base_output_folder={base_output_folder}")
+    print(f"[save_image] source_name={source_name}")
+    print(f"[save_image] output_folder={output_folder}")
+    print(f"[save_image] save_filename={save_filename}")
+
+    try:
+        # BGR -> RGB
+        pil_image = Image.fromarray(frame[..., ::-1])
+        pil_image.save(save_filename, 'JPEG', quality=85)
+        common_widget_actions.create_and_show_toast_message(
+            main_window, 'Image Saved', f'Saved Current Image to file: {save_filename}'
+        )
+    except Exception as e:
+        common_widget_actions.create_and_show_messagebox(
+            main_window, 'Error Saving Image',
+            f'An error occurred while saving the image:\n{e}',
+            parent_widget=main_window.saveImageButton
+        )
+
+
+class CurrentFrameEmbBatchWorker(QtCore.QThread):
+    """
+    只針對「目前 UI 顯示的那一偵」逐一切換所有 EMB 並各自存圖的背景執行緒。
+    會沿用單張儲存的輸出邏輯（Output to Target / Output folder、子資料夾為 EMB 名稱、檔名加後綴）。
+    透過 progress 訊號更新既有的 batchProgressBar，不會卡 UI。
+    """
+    progress = QtCore.Signal(int, int, str, int, int)  # file_idx, total_files, filename(label), frame_idx, total_frames
+    finished = QtCore.Signal(str)
+
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+        self._is_running = True
+
+    def stop(self):
+        self._is_running = False
+
+    def run(self):
+        try:
+            # ---- 本地 import，避免循環匯入 ----
+            from PIL import Image
+            import os, time
+            try:
+                # 若專案有 helper，就沿用檔名規則；沒有就走 fallback
+                from app.ui.widgets.actions import misc_helpers
+            except Exception:
+                misc_helpers = None
+
+            # ---- 取主要參照 ----
+            tf_btn = getattr(self.main_window, 'cur_selected_target_face_button', None)
+            merged_embeddings = getattr(self.main_window, 'merged_embeddings', {})
+            video_processor = self.main_window.video_processor
+
+            if not tf_btn or not merged_embeddings:
+                self.finished.emit("No target face or embeddings to process.")
+                return
+
+            # ---- 產生「畫面指紋」與「等待畫面更新」的內部工具 ----
+            def _frame_fingerprint(frame):
+                try:
+                    import numpy as np
+                    if frame is None:
+                        return None
+                    # 輕量取樣指紋：每 32 像素取一點，只取單通道
+                    sample = frame[::32, ::32, 0]
+                    return int(sample.sum())
+                except Exception:
+                    return None
+
+            def _wait_until_frame_updated(before_sig, timeout_ms=8000):
+                """等待 current_frame 與 before_sig 不同（代表新 EMB 的結果已完成）"""
+                t0 = time.time()
+
+                # 若 video_processor 有 is_processing 旗標，先等它變 False
+                if hasattr(video_processor, 'is_processing'):
+                    while self._is_running and getattr(video_processor, 'is_processing', False):
+                        QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 50)
+                        self.msleep(30)
+                        if (time.time() - t0) * 1000 > timeout_ms:
+                            return False
+
+                # 再用指紋判斷實際畫面是否更新
+                while self._is_running and (time.time() - t0) * 1000 <= timeout_ms:
+                    cur = getattr(video_processor, 'current_frame', None)
+                    sig = _frame_fingerprint(cur)
+                    if sig is not None and sig != before_sig:
+                        return True
+                    QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 50)
+                    self.msleep(30)
+                return False
+
+            # ---- 取得輸出根目錄（沿用單張儲存規則）----
+            output_to_target = self.main_window.control.get('OutputToTargetLocationToggle', False)
+            if output_to_target:
+                if self.main_window.selected_video_button and self.main_window.selected_video_button.media_path:
+                    base_output_folder = os.path.dirname(self.main_window.selected_video_button.media_path)
+                else:
+                    self.finished.emit("No target media selected to determine output path.")
+                    return
+            else:
+                base_output_folder = self.main_window.outputFolderLineEdit.text()
+                if not base_output_folder:
+                    self.finished.emit("No Output folder set.")
+                    return
+
+            # ---- 備份原本指派（結束時會復原）----
+            original_assigned = dict(getattr(tf_btn, 'assigned_merged_embeddings', {}))
+
+            total = len(merged_embeddings)
+            for idx, (emb_id, emb_btn) in enumerate(merged_embeddings.items()):
+                if not self._is_running:
+                    break
+
+                # 記住切 EMB 前的畫面指紋（避免上一張殘影）
+                before_sig = _frame_fingerprint(getattr(video_processor, 'current_frame', None))
+
+                # 1) 指派單一 EMB 到 target face
+                tf_btn.assigned_merged_embeddings = {emb_id: emb_btn.embedding_store}
+                tf_btn.calculate_assigned_input_embedding()
+
+                # 2) 只處理「目前這一偵」
+                video_processor.process_current_frame()
+
+                # 3) 等待畫面真的更新（關鍵：避免 off-by-one 錯位）
+                _wait_until_frame_updated(before_sig, timeout_ms=8000)
+
+                frame = getattr(video_processor, 'current_frame', None)
+                if frame is None:
+                    self.progress.emit(idx + 1, total, "no_frame", 1, 1)
+                    continue
+
+                # 4) 子資料夾 = EMB 名稱
+                cluster_by_source = self.main_window.control.get('ClusterOutputBySourceToggle', True)
+                emb_name = getattr(emb_btn, 'embedding_name', str(emb_id))
+                source_name = "".join([c for c in emb_name if c.isalnum() or c in "._-"]).rstrip() or "exported"
+                output_folder = base_output_folder
+                if cluster_by_source:
+                    output_folder = os.path.join(base_output_folder, source_name)
+                try:
+                    os.makedirs(output_folder, exist_ok=True)
+                except Exception:
+                    self.progress.emit(idx + 1, total, source_name, 1, 1)
+                    continue
+
+                # 5) 檔名：保留原規則骨架，再加時間前綴＋6位亂碼，避免覆蓋
+                if misc_helpers is not None:
+                    tmp = misc_helpers.get_output_file_path(
+                        video_processor.media_path, output_folder, media_type='image'
+                    )
+                    base_noext, _ = os.path.splitext(tmp)
+                    stem = os.path.basename(base_noext)   # 原本檔名主體
+                else:
+                    base_name = os.path.splitext(os.path.basename(getattr(video_processor, 'media_path', 'frame')))[0]
+                    stem = base_name
+
+                if cluster_by_source and source_name:
+                    stem = f"{stem}_{source_name}"
+
+                import datetime, secrets, string
+                ts = datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+                rand = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(6))
+
+                save_path = os.path.join(output_folder, f"{ts}_{stem}_{rand}.jpg")
+
+
+                # 6) 寫檔（BGR -> RGB），不跳通知
+                try:
+                    pil = Image.fromarray(frame[..., ::-1])
+                    pil.save(save_path, 'JPEG', quality=85)
+                except Exception:
+                    pass
+
+                # 7) 更新進度列（沿用你的 update_batch_progress）
+                self.progress.emit(idx + 1, total, source_name, 1, 1)
+
+            # ---- 復原原本指派與畫面 ----
+            tf_btn.assigned_merged_embeddings = original_assigned
+            tf_btn.calculate_assigned_input_embedding()
+            video_processor.process_current_frame()
+
+            self.finished.emit("Embedding batch (current frame) completed." if self._is_running else "Embedding batch cancelled.")
+        except Exception as e:
+            self.finished.emit(f"Error: {e}")
+
+
+    def _frame_fingerprint(self, frame):
+        """
+        產生一個很快的「畫面指紋」用於判斷畫面是否真的更新。
+        取樣縮小後加總，避免重成本計算。
+        """
+        try:
+            import numpy as np
+            if frame is None:
+                return None
+            # 取樣：每 32 像素取一點，只拿單一通道避免計算太重
+            sample = frame[::32, ::32, 0]
+            return int(sample.sum())
+        except Exception:
+            return None
+
+    def _wait_until_frame_updated(self, before_sig, timeout_ms=8000):
+        """
+        等待 current_frame 的指紋與 before_sig 不同（代表畫面已換成新 EMB 的結果）。
+        期間持續讓事件循環跑，避免 UI 卡住；同時支援被 stop() 中斷。
+        """
+        import time
+        t0 = time.time()
+
+        # 如果你的 video_processor 有 is_processing 旗標，先優先等它變 False
+        vp = self.main_window.video_processor
+        if hasattr(vp, 'is_processing'):
+            while self._is_running and getattr(vp, 'is_processing', False):
+                QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 50)
+                self.msleep(30)
+                if (time.time() - t0) * 1000 > timeout_ms:
+                    return False
+
+        # 再用指紋檢查畫面是否真的更新
+        while self._is_running and (time.time() - t0) * 1000 <= timeout_ms:
+            cur = getattr(self.main_window.video_processor, 'current_frame', None)
+            sig = self._frame_fingerprint(cur)
+            if sig is not None and sig != before_sig:
+                return True
+            QtCore.QCoreApplication.processEvents(QtCore.QEventLoop.AllEvents, 50)
+            self.msleep(30)
+        return False
+        
+
+
+
+
+
+def batch_save_current_frame_all_embeddings(main_window: 'MainWindow'):
+    """
+    啟動背景執行緒：僅針對目前 UI 這一偵，逐一切換所有 EMB，各自存檔。
+    會顯示你現有的 batchProgressWidget，不會卡住 UI，也不會跳出通知。
+    """
+    # 基本檢查留在 UI 執行緒（必要時用既有 messagebox 提示）
+    tf_btn = getattr(main_window, 'cur_selected_target_face_button', None)
+    if not tf_btn:
+        common_widget_actions.create_and_show_messagebox(
+            main_window, 'No Target Face Selected',
+            'Please select a target face before batch saving.',
+            parent_widget=getattr(main_window, 'saveImageButton', None)
+        )
+        return
+
+    merged_embeddings = getattr(main_window, 'merged_embeddings', {})
+    if not merged_embeddings:
+        common_widget_actions.create_and_show_messagebox(
+            main_window, 'No Embeddings Found',
+            'There are no embeddings to iterate over.',
+            parent_widget=getattr(main_window, 'saveImageButton', None)
+        )
+        return
+
+    # 顯示進度條（沿用你現有的 UI 元件）
+    main_window.batchProgressBar.setValue(0)
+    main_window.batchProgressLabel.setText("Starting embedding batch (current frame)...")
+    main_window.batchProgressWidget.show()
+
+    # 若上一次 worker 還在，就不要重複啟動
+    worker = getattr(main_window, 'frame_emb_batch_worker', None)
+    if worker and worker.isRunning():
+        print("Embedding frame batch already running.")
+        return
+
+    # 建立並啟動 worker
+    worker = CurrentFrameEmbBatchWorker(main_window)
+    main_window.frame_emb_batch_worker = worker
+    worker.progress.connect(main_window.update_batch_progress)
+    worker.finished.connect(main_window.on_batch_processing_finished)
+    worker.start()

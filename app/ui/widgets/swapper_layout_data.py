@@ -8,7 +8,21 @@ SWAPPER_LAYOUT_DATA: LayoutDictTypes = {
         'SwapModelSelection': {
             'level': 1,
             'label': 'Swapper Model',
-            'options': ['Inswapper128', 'InStyleSwapper256 Version A', 'InStyleSwapper256 Version B', 'InStyleSwapper256 Version C', 'DeepFaceLive (DFM)', 'SimSwap512', 'GhostFace-v1', 'GhostFace-v2', 'GhostFace-v3', 'CSCS'],            'default': 'Inswapper128',
+            'options': [
+                'Inswapper128',
+                'InStyleSwapper256 Version A',
+                'InStyleSwapper256 Version B',
+                'InStyleSwapper256 Version C',
+                'Hyperswap256 Version A',
+                'Hyperswap256 Version B',
+                'Hyperswap256 Version C',
+                'DeepFaceLive (DFM)',
+                'SimSwap512',
+                'GhostFace-v1',
+                'GhostFace-v2',
+                'GhostFace-v3',
+                'CSCS'],
+            'default': 'Inswapper128',
             'help': 'Choose which swapper model to use for face swapping.'
         },
         'SwapperResSelection': {
@@ -19,6 +33,14 @@ SWAPPER_LAYOUT_DATA: LayoutDictTypes = {
             'parentSelection': 'SwapModelSelection',
             'requiredSelectionValue': 'Inswapper128',
             'help': 'Select the resolution for the swapped face in pixels. Higher values offer better quality but are slower to process.'
+        },
+        'SwapperResAutoSelectEnableToggle': {
+            'level': 2,
+            'label': 'Enable Auto Resolution',
+            'default': False,
+            'parentSelection': 'SwapModelSelection',
+            'requiredSelectionValue': 'Inswapper128',
+            'help': 'Autoselect Swapper Resolution based on original Face Size (only for Inswapper).'
         },
         'DFMModelSelection': {
             'level': 2,
@@ -47,176 +69,8 @@ SWAPPER_LAYOUT_DATA: LayoutDictTypes = {
             'parentSelection': 'SwapModelSelection',
             'requiredSelectionValue': 'DeepFaceLive (DFM)',
             'help': 'RCT Color Transfer for DFM Models',
-        }
-    },
-    'Face Landmarks Correction': {
-        'FaceAdjEnableToggle': {
-            'level': 1,
-            'label': 'Face Adjustments',
-            'default': False,
-            'help': 'This is an experimental feature to perform direct adjustments to the face landmarks found by the detector. There is also an option to adjust the scale of the swapped face.'
         },
-        'KpsXSlider': {
-            'level': 2,
-            'label': 'Keypoints X-Axis',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'FaceAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the detection points left and right.'
-        },
-        'KpsYSlider': {
-            'level': 2,
-            'label': 'Keypoints Y-Axis',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'FaceAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the detection points up and down.'
-        },
-        'KpsScaleSlider': {
-            'level': 2,
-            'label': 'Keypoints Scale',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'FaceAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Grows and shrinks the detection point distances.'
-        },
-        'FaceScaleAmountSlider': {
-            'level': 2,
-            'label': 'Face Scale Amount',
-            'min_value': '-20',
-            'max_value': '20',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'FaceAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Grows and shrinks the entire face.'
-        },
-        'LandmarksPositionAdjEnableToggle': {
-            'level': 1,
-            'label': '5 - Keypoints Adjustments',
-            'default': False,
-            'help': 'This is an experimental feature to perform direct adjustments to the position of face landmarks found by the detector.'
-        },
-        'EyeLeftXAmountSlider': {
-            'level': 2,
-            'label': 'Left Eye:   X',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'LandmarksPositionAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the eye left detection point left and right.'
-        },
-        'EyeLeftYAmountSlider': {
-            'level': 2,
-            'label': 'Left Eye:   Y',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'LandmarksPositionAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the eye left detection point up and down.'
-        },
-        'EyeRightXAmountSlider': {
-            'level': 2,
-            'label': 'Right Eye:   X',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'LandmarksPositionAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the eye right detection point left and right.'
-        },
-        'EyeRightYAmountSlider': {
-            'level': 2,
-            'label': 'Right Eye:   Y',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'LandmarksPositionAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the eye right detection point up and down.'
-        },
-        'NoseXAmountSlider': {
-            'level': 2,
-            'label': 'Nose:   X',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'LandmarksPositionAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the nose detection point left and right.'
-        },
-        'NoseYAmountSlider': {
-            'level': 2,
-            'label': 'Nose:   Y',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'LandmarksPositionAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the nose detection point up and down.'
-        },
-        'MouthLeftXAmountSlider': {
-            'level': 2,
-            'label': 'Left Mouth:   X',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'LandmarksPositionAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the mouth left detection point left and right.'
-        },
-        'MouthLeftYAmountSlider': {
-            'level': 2,
-            'label': 'Left Mouth:   Y',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'LandmarksPositionAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the mouth left detection point up and down.'
-        },
-        'MouthRightXAmountSlider': {
-            'level': 2,
-            'label': 'Right Mouth:   X',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'LandmarksPositionAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the mouth Right detection point left and right.'
-        },
-        'MouthRightYAmountSlider': {
-            'level': 2,
-            'label': 'Right Mouth:   Y',
-            'min_value': '-100',
-            'max_value': '100',
-            'default': '0',
-            'step': 1,
-            'parentToggle': 'LandmarksPositionAdjEnableToggle',
-            'requiredToggleValue': True,
-            'help': 'Shifts the mouth Right detection point up and down.'
-        },
-    },
+    }, 
     'Face Similarity': {
         'SimilarityThresholdSlider': {
             'level': 1,
@@ -262,35 +116,238 @@ SWAPPER_LAYOUT_DATA: LayoutDictTypes = {
             'requiredToggleValue': True,
             'help': 'Determines the factor of likeness between the source and assigned faces.'
         },
+    },    
+    'Swap <--> Original Interference': {
         'DifferencingEnableToggle': {
             'level': 1,
             'label': 'Differencing',
             'default': False,
             'help': 'Allow some of the original face to show in the swapped result when the difference between the two images is small. Can help bring back some texture to the swapped face.'
         },
-        'DifferencingAmountSlider': {
+        'DifferencingLowerLimitThreshSlider': {
             'level': 2,
-            'label': 'Amount',
+            'label': 'Difference Lower Limit',
             'min_value': '0',
             'max_value': '100',
-            'default': '4',
+            'default': '14',
             'step': 1,
             'parentToggle': 'DifferencingEnableToggle',
             'requiredToggleValue': True,
-            'help': 'Higher values relaxes the similarity constraint.'
-        },
+            'help': 'Definese pixels with difference under lower limit. Pixels with difference below this will get differenced between "lower amount" and "middle amount" (0= 100% original face, 100 = 100% swap face)'
+        },   
+        'DifferencingUpperLimitThreshSlider': {
+            'level': 2,
+            'label': 'Difference Upper Limit',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '32',
+            'step': 1,
+            'parentToggle': 'DifferencingEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Definese pixels with difference between lower limit and upper limit. Pixels with difference between these thresholds will get differenced between "middle amount" and "upper amount" (0 = 100% original face, 100 = 100% swap face)'
+        },             
+        'DifferencingLowerLimitValueSlider': {
+            'level': 2,
+            'label': 'Lower Amount',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '34',
+            'step': 1,
+            'parentToggle': 'DifferencingEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Starting value for pixel differences bellow lower treshold (0 = 100% original face, 100 = 100% swap face)'
+        },                                      
+        'DifferencingMiddleLimitValueSlider': {
+            'level': 2,
+            'label': 'Middle Amount',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '62',
+            'step': 1,
+            'parentToggle': 'DifferencingEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'End Value for pixel differences bellow lower treshold, starting value for pixel differences above lower treshold (0 = 100% original face, 100 = 100% swap face)'
+        },       
+        'DifferencingUpperLimitValueSlider': {
+            'level': 2,
+            'label': 'Upper Amount',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '88',
+            'step': 1,
+            'parentToggle': 'DifferencingEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'End Value for pixel differences below upper treshold, starting value for pixel differences above upper treshold (0 = 100% original face, 100 = 100% swap face)'
+        },         
         'DifferencingBlendAmountSlider': {
             'level': 2,
             'label': 'Blend Amount',
             'min_value': '0',
             'max_value': '100',
-            'default': '5',
+            'default': '8',
             'step': 1,
             'parentToggle': 'DifferencingEnableToggle',
             'requiredToggleValue': True,
-            'help': 'Blend differecing value.'
+            'help': 'Mask Blur for smoother transitions'
+        },   
+        'TransferTextureEnableToggle': {
+            'level': 1,
+            'label': 'Transfer Texture',
+            'default': False,
+            'help': 'Enable Texture Transfer'
         },
-    },
+        'TransferTextureBlendAmountSlider': {
+            'level': 2,
+            'label': 'Strength Multiplier',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '30',
+            'step': 1,
+            'parentToggle': 'TransferTextureEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Decrease/Increase calculated Texture Differences. 50 is standard calculated Difference'
+        },               
+        'TransferTextureSigmaDecimalSlider': {
+            'level': 2,
+            'label': 'Sigma',
+            'min_value': '0.10',
+            'max_value': '1.50',
+            'default': '0.10',
+            'decimals': 2,
+            'step': 0.01,
+            'parentToggle': 'TransferTextureEnableToggle',
+            'requiredToggleValue': True,
+            'help': '0.1 always works. experiment with higher values for higher texture effect (higher theta values may be needed)'
+        },        
+        'TransferTextureThetaSlider': {
+            'level': 2,
+            'label': 'Theta',
+            'min_value': '1',
+            'max_value': '16',
+            'default': '1',
+            'decimals': 2,
+            'step': 1,
+            'parentToggle': 'TransferTextureEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'When swap looks grainy (can happen mostly with "weight"=0) increase. also can help on higher sigma/Strength Multiplier values'
+        },    
+        'TransferTextureWeightSlider': {
+            'level': 2,
+            'label': 'Weight',
+            'min_value': '0',
+            'max_value': '1',
+            'default': '1',
+            'step': 1,
+            'parentToggle': 'TransferTextureEnableToggle',
+            'requiredToggleValue': True,
+            'help': '1 calculates with original image colors. experiment. When swap looks grainy (can happen mostly with "weight"=0, increase theta.'
+        },                        
+        'ExcludeMaskEnableToggle': {
+            'level': 1,
+            'label': 'Exclude-Features Texture Mask',
+            'default': False,
+            'help': 'Exclude Faceparts from Texture Transfere and Face Differencing and uses the original Swap there. needed for more aggressive texture transfer values. slows swapping because 2xfaceparser is used'
+        },        
+        'EyebrowParserTextureSlider': {
+            'level': 2,
+            'label': 'Eyebrows',
+            'min_value': '0',
+            'max_value': '10',
+            'default': '1',
+            'step': 1,
+            'parentToggle': 'ExcludeMaskEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Exclude Faceparts (Eyes, Eyebrows, Nose, Mouth, Lips, Neck), 0=whole face is used, 1= Parts not included, 1+ = increase Parts size. Most of the time should be 1/1+. try 0 on low quality/artefacted targets'
+        },         
+        'EyeParserTextureSlider': {
+            'level': 2,
+            'label': 'Eyes',
+            'min_value': '0',
+            'max_value': '10',
+            'default': '1',
+            'step': 1,
+            'parentToggle': 'ExcludeMaskEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Exclude Faceparts (Eyes, Eyebrows, Nose, Mouth, Lips, Neck), 0=whole face is used, 1= Parts not included, 1+ = increase Parts size. Most of the time should be 1/1+. try 0 on low quality/artefacted targets'
+        },        
+        'NoseParserTextureSlider': {
+            'level': 2,
+            'label': 'Nose',
+            'min_value': '0',
+            'max_value': '10',
+            'default': '1',
+            'step': 1,
+            'parentToggle': 'ExcludeMaskEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Exclude Faceparts (Eyes, Eyebrows, Nose, Mouth, Lips, Neck), 0=whole face is used, 1= Parts not included, 1+ = increase Parts size. Most of the time should be 1/1+. try 0 on low quality/artefacted targets'
+        },        
+        'MouthParserTextureSlider': {
+            'level': 2,
+            'label': 'Mouth',
+            'min_value': '0',
+            'max_value': '10',
+            'default': '1',
+            'step': 1,
+            'parentToggle': 'ExcludeMaskEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Exclude Faceparts (Eyes, Eyebrows, Nose, Mouth, Lips, Neck), 0=whole face is used, 1= Parts not included, 1+ = increase Parts size. Most of the time should be 1/1+. try 0 on low quality/artefacted targets'
+        },        
+        'NeckParserTextureSlider': {
+            'level': 2,
+            'label': 'Neck',
+            'min_value': '0',
+            'max_value': '10',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'ExcludeMaskEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Exclude Faceparts (Eyes, Eyebrows, Nose, Mouth, Lips, Neck), 0=whole face is used, 1= Parts not included, 1+ = increase Parts size. Most of the time should be 1/1+. try 0 on low quality/artefacted targets'
+        },        
+        'BackgroundParserTextureSlider': {
+            'level': 2,
+            'label': 'Background',
+            'min_value': '-50',
+            'max_value': '50',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'ExcludeMaskEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Increase/Decrease Background Area for Texture Transfer.'
+        },  
+        'FaceParserBlendTextureSlider': {
+            'level': 2,
+            'label': 'Excluded Texture Blend',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'ExcludeMaskEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Blend Amount of Excluded Feature Areas'
+        },         
+        'FaceParserBlurTextureSlider': {
+            'level': 2,
+            'label': 'Texture Mask Blur',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '6',
+            'step': 1,
+            'parentToggle': 'ExcludeMaskEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Mask Blur on excluded Area Edges'
+        },         
+        'FaceParserBlurBGTextureSlider': {
+            'level': 2,
+            'label': 'Texture BG Mask Blur',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '6',
+            'step': 1,
+            'parentToggle': 'ExcludeMaskEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Mask Blur on excluded Background Area Edges'
+        },    
+    },    
     'Face Mask':{
         'BorderBottomSlider':{
             'level': 1,
@@ -363,8 +420,8 @@ SWAPPER_LAYOUT_DATA: LayoutDictTypes = {
         'DFLXSegSizeSlider': {
             'level': 2,
             'label': 'Size',
-            'min_value': '-100',
-            'max_value': '100',
+            'min_value': '-20',
+            'max_value': '20',
             'default': '0',
             'step': 1,
             'parentToggle': 'DFLXSegEnableToggle',
@@ -379,6 +436,67 @@ SWAPPER_LAYOUT_DATA: LayoutDictTypes = {
             'default': '0',
             'step': 1,
             'parentToggle': 'OccluderEnableToggle | DFLXSegEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Blend value for Occluder and XSeg.'
+        },
+        'XSegMouthEnableToggle': {
+            'level': 1,
+            'label': 'Xseg Mouth',
+            'default': False,
+            'help': 'Allow objects occluding the face to show up in the swapped image.'
+        },
+        'DFLXSeg2SizeSlider': {
+            'level': 2,
+            'label': 'Size2',
+            'min_value': '-20',
+            'max_value': '20',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'XSegMouthEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Grows or shrinks the occluded region.'
+        },       
+        'XsegUpperLipParserSlider': {
+            'level': 2,
+            'label': 'Upper Lip',
+            'min_value': '0',
+            'max_value': '20',
+            'default': '2',
+            'step': 1,
+            'parentToggle': 'XSegMouthEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Grows or shrinks the occluded region.'
+        },
+        'XsegMouthParserSlider': {
+            'level': 2,
+            'label': 'Mouth',
+            'min_value': '0',
+            'max_value': '20',
+            'default': '2',
+            'step': 1,
+            'parentToggle': 'XSegMouthEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Grows or shrinks the occluded region.'
+        },
+        'XsegLowerLipParserSlider': {
+            'level': 2,
+            'label': 'Lower Lip',
+            'min_value': '0',
+            'max_value': '20',
+            'default': '10',
+            'step': 1,
+            'parentToggle': 'XSegMouthEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Grows or shrinks the occluded region.'
+        },
+        'XSeg2BlurSlider': {
+            'level': 1,
+            'label': 'XSeg2 Blur',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '4',
+            'step': 1,
+            'parentToggle': 'XSegMouthEnableToggle',
             'requiredToggleValue': True,
             'help': 'Blend value for Occluder and XSeg.'
         },
@@ -897,7 +1015,7 @@ SWAPPER_LAYOUT_DATA: LayoutDictTypes = {
             'parentToggle': 'AutoColorEnableToggle',
             'requiredToggleValue': True,
             'help': 'Select the AutoColor transfer method type. Hans Method could have some artefacts sometimes.'
-        },
+        }, 
         'AutoColorBlendAmountSlider': {
             'level': 1,
             'label': 'Blend Amount',
@@ -1020,19 +1138,18 @@ SWAPPER_LAYOUT_DATA: LayoutDictTypes = {
             'requiredToggleValue': True,
             'help': 'Changes the Gamma.'
         },
+    },
+    'Distortion Simulation':{    
         'ColorNoiseDecimalSlider': {
             'level': 1,
             'label': 'Noise',
             'min_value': '0.0',
-            'max_value': '20.0',
-            'default': '0.0',
-            'step': 0.5,
-            'decimals': 1,
-            'parentToggle': 'ColorEnableToggle',
-            'requiredToggleValue': True,
+            'max_value': '10.0',
+            'default': '0.00',
+            'step': 0.05,
+            'decimals': 2,
             'help': 'Add noise to swapped face.'
-        },
-
+        },        
         'JPEGCompressionEnableToggle': {
             'level': 1,
             'label': 'JPEG Compression',
@@ -1044,14 +1161,53 @@ SWAPPER_LAYOUT_DATA: LayoutDictTypes = {
             'label': 'Compression',
             'min_value': '1',
             'max_value': '100',
-            'default': '50',
+            'default': '70',
             'step': 1,
             'parentToggle': 'JPEGCompressionEnableToggle',
             'requiredToggleValue': True,
             'help': 'Adjust the JPEG Compression amount'
-        }
+        },        
+        'BlockShiftEnableToggle': {
+            'level': 1,
+            'label': 'Block Shift',
+            'default': False,
+            'help': 'Apply MPEG Compression like Block Shift Effect',
+        },
+        'BlockShiftAmountSlider': {
+            'level': 2,
+            'label': 'Block Size',
+            'min_value': '1',
+            'max_value': '8',
+            'default': '6',
+            'step': 1,
+            'parentToggle': 'BlockShiftEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Size of (Pixel) Blocks'
+        },        
+        'BlockShiftMaxAmountSlider': {
+            'level': 2,
+            'label': 'Shift Maximum',
+            'min_value': '1',
+            'max_value': '20',
+            'default': '1',
+            'step': 1,
+            'parentToggle': 'BlockShiftEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Maximum Shift of each Block'
+        },        
+        'BlockShiftBlendAmountSlider': {
+            'level': 2,
+            'label': 'Blend Amount',
+            'min_value': '1',
+            'max_value': '100',
+            'default': '20',
+            'step': 1,
+            'parentToggle': 'BlockShiftEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Blend Amount'
+        },
     },
-    'Blend Adjustments':{
+    'Blend Adjustments':{    
         'FinalBlendAdjEnableToggle': {
             'level': 1,
             'label': 'Final Blend',
@@ -1079,4 +1235,230 @@ SWAPPER_LAYOUT_DATA: LayoutDictTypes = {
             'help': 'Combined masks blending distance. It is not applied to the border masks.'
         },        
     },
+    'Face Landmarks Correction': {
+        'FaceAdjEnableToggle': {
+            'level': 1,
+            'label': 'Face Adjustments',
+            'default': False,
+            'help': 'This is an experimental feature to perform direct adjustments to the face landmarks found by the detector. There is also an option to adjust the scale of the swapped face.'
+        },
+        'KpsXSlider': {
+            'level': 2,
+            'label': 'Keypoints X-Axis',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'FaceAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the detection points left and right.'
+        },
+        'KpsYSlider': {
+            'level': 2,
+            'label': 'Keypoints Y-Axis',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'FaceAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the detection points up and down.'
+        },
+        'KpsScaleSlider': {
+            'level': 2,
+            'label': 'Keypoints Scale',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'FaceAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Grows and shrinks the detection point distances.'
+        },
+        'FaceScaleAmountSlider': {
+            'level': 2,
+            'label': 'Face Scale Amount',
+            'min_value': '-20',
+            'max_value': '20',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'FaceAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Grows and shrinks the entire face.'
+        },
+        'LandmarksPositionAdjEnableToggle': {
+            'level': 1,
+            'label': '5 - Keypoints Adjustments',
+            'default': False,
+            'help': 'This is an experimental feature to perform direct adjustments to the position of face landmarks found by the detector.'
+        },
+        'EyeLeftXAmountSlider': {
+            'level': 2,
+            'label': 'Left Eye:   X',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'LandmarksPositionAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the eye left detection point left and right.'
+        },
+        'EyeLeftYAmountSlider': {
+            'level': 2,
+            'label': 'Left Eye:   Y',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'LandmarksPositionAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the eye left detection point up and down.'
+        },
+        'EyeRightXAmountSlider': {
+            'level': 2,
+            'label': 'Right Eye:   X',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'LandmarksPositionAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the eye right detection point left and right.'
+        },
+        'EyeRightYAmountSlider': {
+            'level': 2,
+            'label': 'Right Eye:   Y',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'LandmarksPositionAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the eye right detection point up and down.'
+        },
+        'NoseXAmountSlider': {
+            'level': 2,
+            'label': 'Nose:   X',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'LandmarksPositionAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the nose detection point left and right.'
+        },
+        'NoseYAmountSlider': {
+            'level': 2,
+            'label': 'Nose:   Y',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'LandmarksPositionAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the nose detection point up and down.'
+        },
+        'MouthLeftXAmountSlider': {
+            'level': 2,
+            'label': 'Left Mouth:   X',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'LandmarksPositionAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the mouth left detection point left and right.'
+        },
+        'MouthLeftYAmountSlider': {
+            'level': 2,
+            'label': 'Left Mouth:   Y',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'LandmarksPositionAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the mouth left detection point up and down.'
+        },
+        'MouthRightXAmountSlider': {
+            'level': 2,
+            'label': 'Right Mouth:   X',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'LandmarksPositionAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the mouth Right detection point left and right.'
+        },
+        'MouthRightYAmountSlider': {
+            'level': 2,
+            'label': 'Right Mouth:   Y',
+            'min_value': '-100',
+            'max_value': '100',
+            'default': '0',
+            'step': 1,
+            'parentToggle': 'LandmarksPositionAdjEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Shifts the mouth Right detection point up and down.'
+        },
+    }, 
+    'Interpolation Type (very experimental, better don´t touch)': {        
+        'get_cropped_face_kpsTypeSelection': {
+            'level': 1,
+            'label': 'get cropped face kps',
+            'options': ['NEAREST', 'BILINEAR'],
+            'default': 'BILINEAR',
+            'help': 'Experimental! for basic functionality testing. changes the interpolation type for necessary pipeline functions (resize/rotation/etc. of image). caution, influences Autorestore calculation'
+        },        
+        'original_face_128_384TypeSelection': {
+            'level': 1,
+            'label': 'original_128_384',
+            'options': ['NEAREST', 'BILINEAR'],
+            'default': 'BILINEAR',
+            'help': 'Experimental! for basic functionality testing. changes the interpolation type for necessary pipeline functions (resize/rotation/etc. of image). caution, influences Autorestore calculation'
+        },        
+        'original_face_512TypeSelection': {
+            'level': 1,
+            'label': 'original_512',
+            'options': ['NEAREST', 'BILINEAR'],
+            'default': 'BILINEAR',
+            'help': 'Experimental! for basic functionality testing. changes the interpolation type for necessary pipeline functions (resize/rotation/etc. of image). caution, influences Autorestore calculation'
+        },         
+        'UntransformTypeSelection': {
+            'level': 1,
+            'label': 'Untransform',
+            'options': ['NEAREST', 'BILINEAR'],
+            'default': 'BILINEAR',
+            'help': 'Experimental! for basic functionality testing. changes the interpolation type for necessary pipeline functions (resize/rotation/etc. of image). caution, influences Autorestore calculation'
+        },         
+        'expression_faceeditor_t256TypeSelection': {
+            'level': 1,
+            'label': 'Expression_faceeditor_t256',
+            'options': ['NEAREST', 'BILINEAR'],
+            'default': 'BILINEAR',
+            'help': 'Experimental! for basic functionality testing. changes the interpolation type for necessary pipeline functions (resize/rotation/etc. of image). caution, influences Autorestore calculation'
+        },         
+        'expression_faceeditor_backTypeSelection': {
+            'level': 1,
+            'label': 'Expression_faceeditor_back',
+            'options': ['NEAREST', 'BILINEAR'],
+            'default': 'BILINEAR',
+            'help': 'Experimental! for basic functionality testing. changes the interpolation type for necessary pipeline functions (resize/rotation/etc. of image). caution, influences Autorestore calculation'
+        },         
+        'block_shiftTypeSelection': {
+            'level': 1,
+            'label': 'block shift',
+            'options': ['NEAREST', 'BILINEAR'],
+            'default': 'NEAREST',
+            'help': 'Experimental! for basic functionality testing. changes the interpolation type for necessary pipeline functions (resize/rotation/etc. of image). caution, influences Autorestore calculation'
+        },         
+        'AntialiasTypeSelection': {
+            'level': 1,
+            'label': 'Antialias',
+            'options': ['False', 'True'],
+            'default': 'False',
+            'help': 'Experimental! most of the time no visual effect, in rare cases minor effect'
+        }, 
+    },       
 }

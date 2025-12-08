@@ -51,7 +51,6 @@ class ModelsProcessor(QtCore.QObject):
         self.device = device
         self.model_lock = threading.RLock()  # Reentrant lock for model access
         self.trt_ep_options = {
-            # 'trt_max_workspace_size': 3 << 30,  # Dimensione massima dello spazio di lavoro in bytes
             'trt_engine_cache_enable': True,
             'trt_engine_cache_path': "tensorrt-engines",
             'trt_timing_cache_enable': True,
@@ -68,25 +67,23 @@ class ModelsProcessor(QtCore.QObject):
         self.nThreads = 2
         self.syncvec = torch.empty((1, 1), dtype=torch.float32, device=self.device)
 
-        # Initialize models and models_path
         self.models: Dict[str, onnxruntime.InferenceSession] = {}
         self.models_path = {}
         self.models_data = {}
         for model_data in models_list:
             model_name, model_path = model_data['model_name'], model_data['local_path']
-            self.models[model_name] = None #Model Instance
+            self.models[model_name] = None
             self.models_path[model_name] = model_path
             self.models_data[model_name] = {'local_path': model_data['local_path'], 'hash': model_data['hash'], 'url': model_data.get('url')}
 
         self.dfm_models: Dict[str, DFMModel] = {}
 
         if TENSORRT_AVAILABLE:
-            # Initialize models_trt and models_trt_path
             self.models_trt = {}
             self.models_trt_path = {}
             for model_data in models_trt_list:
                 model_name, model_path = model_data['model_name'], model_data['local_path']
-                self.models_trt[model_name] = None #Model Instance
+                self.models_trt[model_name] = None
                 self.models_trt_path[model_name] = model_path
 
         self.face_detectors = FaceDetectors(self)
@@ -124,21 +121,47 @@ class ModelsProcessor(QtCore.QObject):
 
     def load_model(self, model_name, session_options=None):
         with self.model_lock:
-            self.main_window.model_loading_signal.emit()
-            # QApplication.processEvents()
-            # if not is_file_exists(self.models_path[model_name]):
-            #     download_file(model_name, self.models_path[model_name], self.models_data[model_name]['hash'], self.models_data[model_name]['url'])
-            if session_options is None:
-                model_instance = onnxruntime.InferenceSession(self.models_path[model_name], providers=self.providers)
-            else:
-                model_instance = onnxruntime.InferenceSession(self.models_path[model_name], sess_options=session_options, providers=self.providers)
-
-            # Check if another thread has already loaded an instance for this model, if yes then delete the current one and return that instead
-            if self.models[model_name]:
-                del model_instance
-                gc.collect()
+            # Check if model is already loaded in memory
+            if self.models.get(model_name) is not None:
                 return self.models[model_name]
-            self.main_window.model_loaded_signal.emit()
+
+            model_path = self.models_path.get(model_name)
+            model_data = self.models_data.get(model_name)
+            
+            if not model_path or not model_data:
+                 raise ValueError(f"Model '{model_name}' not found in configuration.")
+
+            # Get model download info
+            model_url = model_data.get('url')
+            model_hash = model_data.get('hash')
+
+            # Download if necessary. download_file handles existence and integrity checks.
+            if model_url and model_hash:
+                if not download_file(model_name, model_path, model_hash, model_url):
+                    # Download failed
+                    raise FileNotFoundError(f"Failed to download or verify model file '{model_path}'.")
+            
+            # If after trying to download, the file is still not there, then fail.
+            if not is_file_exists(model_path):
+                raise FileNotFoundError(f"Model file '{model_path}' not found and could not be downloaded.")
+
+            # Show loading dialog before loading into ONNX runtime
+            self.main_window.model_loading_signal.emit()
+            model_instance = None
+            try:
+                #print(f"Loading model into ONNX Runtime: {model_name}")
+                if session_options is None:
+                    model_instance = onnxruntime.InferenceSession(model_path, providers=self.providers)
+                else:
+                    model_instance = onnxruntime.InferenceSession(model_path, sess_options=session_options, providers=self.providers)
+                
+                self.models[model_name] = model_instance # Store the loaded model
+            except Exception as e:
+                print(f"Error loading model {model_name}: {e}")
+                traceback.print_exc()
+            finally:
+                # Hide loading dialog
+                self.main_window.model_loaded_signal.emit()
 
             return model_instance
 
@@ -162,12 +185,8 @@ class ModelsProcessor(QtCore.QObject):
                 self.main_window.model_loaded_signal.emit()
             return self.dfm_models[dfm_model]
 
-
     def load_model_trt(self, model_name, custom_plugin_path=None, precision='fp16', debug=False):
-        # self.showModelLoadingProgressBar()
-        #time.sleep(0.5)
         self.main_window.model_loading_signal.emit()
-
         if not os.path.exists(self.models_trt_path[model_name]):
             onnx2trt(onnx_model_path=self.models_path[model_name],
                      trt_model_path=self.models_trt_path[model_name],
@@ -176,7 +195,6 @@ class ModelsProcessor(QtCore.QObject):
                      verbose=False
                     )
         model_instance = TensorRTPredictor(model_path=self.models_trt_path[model_name], custom_plugin_path=custom_plugin_path, pool_size=self.nThreads, device=self.device, debug=debug)
-
         self.main_window.model_loaded_signal.emit()
         return model_instance
 
@@ -192,10 +210,9 @@ class ModelsProcessor(QtCore.QObject):
             for model_data in models_trt_list:
                 model_name = model_data['model_name']
                 if isinstance(self.models_trt[model_name], TensorRTPredictor):
-                    # È un'istanza di TensorRTPredictor
                     self.models_trt[model_name].cleanup()
                     del self.models_trt[model_name]
-                    self.models_trt[model_name] = None #Model Instance
+                    self.models_trt[model_name] = None
             gc.collect()
 
     def delete_models_dfm(self):
@@ -226,27 +243,18 @@ class ModelsProcessor(QtCore.QObject):
                                 ('CPUExecutionProvider')
                             ]
                 self.device = 'cuda'
-                if version.parse(trt.__version__) < version.parse("10.2.0") and provider_name == "TensorRT-Engine":
+                if TENSORRT_AVAILABLE and version.parse(trt.__version__) < version.parse("10.2.0") and provider_name == "TensorRT-Engine":
                     print("TensorRT-Engine provider cannot be used when TensorRT version is lower than 10.2.0.")
                     provider_name = "TensorRT"
-
             case "CPU":
-                providers = [
-                                ('CPUExecutionProvider')
-                            ]
+                providers = [('CPUExecutionProvider')]
                 self.device = 'cpu'
             case "CUDA":
-                providers = [
-                                ('CUDAExecutionProvider'),
-                                ('CPUExecutionProvider')
-                            ]
+                providers = [('CUDAExecutionProvider'), ('CPUExecutionProvider')]
                 self.device = 'cuda'
-            #case _:
-
         self.providers = providers
         self.provider_name = provider_name
         self.lp_mask_crop = self.lp_mask_crop.to(self.device)
-
         return self.provider_name
 
     def set_number_of_threads(self, value):
@@ -254,24 +262,24 @@ class ModelsProcessor(QtCore.QObject):
         self.delete_models_trt()
 
     def get_gpu_memory(self):
-        command = "nvidia-smi --query-gpu=memory.total --format=csv"
-        memory_total_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
-        memory_total = [int(x.split()[0]) for i, x in enumerate(memory_total_info)]
-
-        command = "nvidia-smi --query-gpu=memory.free --format=csv"
-        memory_free_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
-        memory_free = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
-
-        memory_used = memory_total[0] - memory_free[0]
-
-        return memory_used, memory_total[0]
+        try:
+            command = "nvidia-smi --query-gpu=memory.total --format=csv"
+            memory_total_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
+            memory_total = [int(x.split()[0]) for i, x in enumerate(memory_total_info)]
+            command = "nvidia-smi --query-gpu=memory.free --format=csv"
+            memory_free_info = sp.check_output(command.split()).decode('ascii').split('\n')[:-1][1:]
+            memory_free = [int(x.split()[0]) for i, x in enumerate(memory_free_info)]
+            memory_used = memory_total[0] - memory_free[0]
+            return memory_used, memory_total[0]
+        except (sp.CalledProcessError, FileNotFoundError):
+            print("Could not query GPU memory. 'nvidia-smi' command might not be available.")
+            return 0, 100
     
     def clear_gpu_memory(self):
         self.delete_models()
         self.delete_models_dfm()
         self.delete_models_trt()
         torch.cuda.empty_cache()
-
 
     def load_inswapper_iss_emap(self, model_name):
         with self.model_lock:
@@ -308,6 +316,12 @@ class ModelsProcessor(QtCore.QObject):
 
     def run_iss_swapper(self, image, embedding, output, version="A"):
         self.face_swappers.run_iss_swapper(image, embedding, output, version)
+
+    def calc_swapper_latent_hyperswap256(self, source_embedding, version="A"):
+        return self.face_swappers.calc_swapper_latent_hyperswap256(source_embedding, version)
+
+    def run_hyperswap256(self, image, embedding, output, version="A"):
+        self.face_swappers.run_hyperswap256(image, embedding, output, version)
 
     def calc_swapper_latent_simswap512(self, source_embedding):
         return self.face_swappers.calc_swapper_latent_simswap512(source_embedding)
@@ -390,11 +404,11 @@ class ModelsProcessor(QtCore.QObject):
     def apply_occlusion(self, img, amount):
         return self.face_masks.apply_occlusion(img, amount)
     
-    def apply_dfl_xseg(self, img, amount):
-        return self.face_masks.apply_dfl_xseg(img, amount)
+    def apply_dfl_xseg(self, img, amount, mouth, parameters):
+        return self.face_masks.apply_dfl_xseg(img, amount, mouth, parameters)
     
-    def apply_face_parser(self, img, parameters):
-        return self.face_masks.apply_face_parser(img, parameters)
+    def apply_face_parser(self, img, parameters, mode):
+        return self.face_masks.apply_face_parser(img, parameters, mode)
     
     def apply_face_makeup(self, img, parameters):
         return self.face_editors.apply_face_makeup(img, parameters)
@@ -405,5 +419,5 @@ class ModelsProcessor(QtCore.QObject):
     def restore_eyes(self, img_orig, img_swap, kpss_orig, blend_alpha=0.5, feather_radius=10, size_factor=3.5, radius_factor_x=1.0, radius_factor_y=1.0, x_offset=0, y_offset=0, eye_spacing_offset=0):
         return self.face_masks.restore_eyes(img_orig, img_swap, kpss_orig, blend_alpha, feather_radius, size_factor, radius_factor_x, radius_factor_y, x_offset, y_offset, eye_spacing_offset)
 
-    def apply_fake_diff(self, swapped_face, original_face, DiffAmount):
-        return self.face_masks.apply_fake_diff(swapped_face, original_face, DiffAmount)
+    def apply_fake_diff(self, swapped_face, original_face, lower_limit_thresh, lower_value, upper_thresh, upper_value, middle_value):
+        return self.face_masks.apply_fake_diff(swapped_face, original_face, lower_limit_thresh, lower_value, upper_thresh, upper_value, middle_value)

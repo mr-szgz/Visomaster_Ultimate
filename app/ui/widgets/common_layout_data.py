@@ -68,6 +68,45 @@ COMMON_LAYOUT_DATA: LayoutDictTypes = {
             'requiredToggleValue': True,
             'help': 'Control the blend ratio between the restored face and the swapped face.'
         },
+        'FaceRestorerAutoEnableToggle': {
+            'level': 2,
+            'label': 'Auto Restore',
+            'default': False,
+            'parentToggle': 'FaceRestorerEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Auto Adjust Restorer Blend Amount'
+        },
+        'FaceRestorerAutoMapEnableToggle': {
+            'level': 2,
+            'label': 'Auto Restore Map',
+            'default': False,
+            'parentToggle': 'FaceRestorerEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Auto Adjust Restorer Blend Amount'
+        },
+        
+        'FaceRestorerAutoAdjustSlider': {
+            'level': 3,
+            'label': 'adjust map sharpness',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '50',
+            'step': 1,
+            'parentToggle': 'FaceRestorerAutoMapEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'increase the restore on parts which are less sharp'
+        },        
+        'FaceRestorerAutoAdjustKernelSlider': {
+            'level': 3,
+            'label': 'sharpness mask blur',
+            'min_value': '0',
+            'max_value': '100',
+            'default': '8',
+            'step': 1,
+            'parentToggle': 'FaceRestorerAutoMapEnableToggle',
+            'requiredToggleValue': True,
+            'help': 'Kernel for blur the restore mask (so not singel pixels gets sharper)'
+        },        
         'FaceRestorerEnable2Toggle': {
             'level': 1,
             'label': 'Enable Face Restorer 2',

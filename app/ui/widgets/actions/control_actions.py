@@ -54,6 +54,12 @@ def set_video_playback_fps(main_window: 'MainWindow', set_video_fps=False):
     if set_video_fps and main_window.video_processor.media_capture:
         main_window.parameter_widgets['VideoPlaybackCustomFpsSlider'].set_value(main_window.video_processor.fps)
 
+def toggle_clipboard_monitoring(main_window: 'MainWindow', checked):
+    """
+    Starts or stops the clipboard monitoring timer in the main window.
+    """
+    main_window.toggle_clipboard_monitoring(checked)
+
 def toggle_virtualcam(main_window: 'MainWindow', toggle_value=False):
     video_processor = main_window.video_processor
     if toggle_value:

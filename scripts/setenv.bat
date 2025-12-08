@@ -26,3 +26,17 @@ SET "FFMPEG_PATH=%DEPENDENCIES%"
 
 :: Add all necessary paths to system PATH
 SET "PATH=%FFMPEG_PATH%;%PYTHON_PATH%;%PYTHON_SCRIPTS%;%CUDA_BIN_PATH%;%TENSORRT_PATH%;%PATH%"
+
+
+:: Get the organizing folder the parent is in
+FOR %%A IN ("%VISO_ROOT%\..") DO SET "VISO_PORTABLE_ROOT=%%~fA"
+
+@REM :: Overide Python paths
+@REM SET "PYTHON_PATH=%VISO_PORTABLE_ROOT%\python"
+@REM SET "PYTHON_SCRIPTS=%PYTHON_PATH%\Scripts"
+@REM SET "PYTHON_EXECUTABLE=%PYTHON_PATH%\python.exe"
+@REM SET "PYTHONW_EXECUTABLE=%PYTHON_PATH%\pythonw.exe"
+
+:: Extend paths for portable install
+set "PYTHONPATH=%VISO_PORTABLE_ROOT%\source;%PYTHONPATH%"
+

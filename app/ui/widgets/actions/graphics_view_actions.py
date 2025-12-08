@@ -61,10 +61,16 @@ def zoom_andfit_image_to_view_onchange(main_window: 'MainWindow', new_transform)
 
 def fit_image_to_view(main_window: 'MainWindow', pixmap_item: QtWidgets.QGraphicsPixmapItem, scene_rect):
     """Reset the view and fit the image to the view, keeping the aspect ratio."""
-    # print("Called fit_image_to_view()")
-    graphicsViewFrame = main_window.graphicsViewFrame
-    # Reset the transform and set the scene rectangle
-    graphicsViewFrame.resetTransform()
-    graphicsViewFrame.setSceneRect(scene_rect)
-    # Fit the image to the view, keeping the aspect ratio
-    graphicsViewFrame.fitInView(pixmap_item, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+    try:
+        # Check if the item is still valid and part of a scene. If not, it has been removed.
+        if pixmap_item and pixmap_item.scene():
+            graphicsViewFrame = main_window.graphicsViewFrame
+            graphicsViewFrame.resetTransform()
+            graphicsViewFrame.setSceneRect(scene_rect)
+            graphicsViewFrame.fitInView(pixmap_item, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
+    except RuntimeError as e:
+        # Catch the specific C++ object deleted error, which can happen in a race condition
+        if "Internal C++ object" in str(e) and "already deleted" in str(e):
+            print("fit_image_to_view: Caught RuntimeError for a deleted QGraphicsPixmapItem. Ignoring.")
+        else:
+            raise  # Re-raise other unexpected RuntimeErrors

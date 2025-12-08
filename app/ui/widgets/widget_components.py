@@ -136,10 +136,6 @@ class TargetMediaCardButton(CardButton):
         video_control_actions.set_up_video_seek_line_edit(main_window)
         # Clear current target faces
         card_actions.clear_target_faces(main_window, refresh_frame=False)
-        # Uncheck input faces
-        card_actions.uncheck_all_input_faces(main_window)
-        # Uncheck merged embeddings
-        card_actions.uncheck_all_merged_embeddings(main_window)
         # Remove all markers
         video_control_actions.remove_all_markers(main_window)
 
@@ -149,7 +145,6 @@ class TargetMediaCardButton(CardButton):
         video_control_actions.reset_media_buttons(main_window)
 
     def load_media(self):
-
         main_window = self.main_window
         # Deselect the currently selected video
         if main_window.selected_video_button:
@@ -222,6 +217,13 @@ class TargetMediaCardButton(CardButton):
             graphics_view_actions.update_graphics_view(main_window, pixmap, 0, reset_fit=True)
 
         self.reset_related_widgets_and_values()
+        
+        # When a new target media is loaded, we should not clear the input selections.
+        # However, the assignments for the *previous* target faces are now invalid.
+        # Instead of unchecking all, we just clear the assignments from the UI perspective.
+        # The actual assignment happens when a target face is clicked.
+        card_actions.uncheck_all_input_faces(main_window)
+        card_actions.uncheck_all_merged_embeddings(main_window)
 
         main_window.video_processor.file_type = self.file_type
         main_window.videoSeekSlider.blockSignals(True)  # Block signals to prevent unnecessary updates
@@ -258,8 +260,8 @@ class TargetMediaCardButton(CardButton):
         if main_window.control['SendVirtCamFramesEnableToggle'] and self.file_type!='image':
             # Re-initialize virtualcam to reset its dimensions with that of the new video
             main_window.video_processor.enable_virtualcam()
-
-        # list_view_actions.find_target_faces(main_window)
+            
+        main_window.update()            
 
     def remove_target_media_from_list(self):
         main_window = self.main_window
@@ -315,7 +317,12 @@ class TargetMediaCardButton(CardButton):
         remove_action = QtGui.QAction('Remove from list', self)
         remove_action.triggered.connect(self.remove_target_media_from_list)
         self.popMenu.addAction(remove_action)
-
+        # Add a separator and the "Clear All" action
+        self.popMenu.addSeparator()
+        clear_all_action = QtGui.QAction('Clear All', self)
+        clear_all_action.triggered.connect(lambda: list_view_actions.clear_all_target_media(self.main_window))
+        self.popMenu.addAction(clear_all_action)
+        
     def on_context_menu(self, point):
         # show context menu
         self.popMenu.exec_(self.mapToGlobal(point))
@@ -323,10 +330,6 @@ class TargetMediaCardButton(CardButton):
 class TargetFaceCardButton(CardButton):
     def __init__(self, media_path, cropped_face, embedding_store: Dict[str, np.ndarray], face_id:str, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # if self.main_window.target_faces:
-        #     self.face_id = max([target_face.face_id for target_face in self.main_window.target_faces]) + 1
-        # else:
-        #     self.face_id = 0
         self.face_id = face_id
         self.media_path = media_path
         self.cropped_face = cropped_face
@@ -383,9 +386,7 @@ class TargetFaceCardButton(CardButton):
         
         main_window.selected_target_face_id = self.face_id
 
-        # print('main_window.selected_target_face_id', main_window.selected_target_face_id)     
         common_widget_actions.set_widgets_values_using_face_id_parameters(main_window=main_window, face_id=self.face_id)      
-        # common_widget_actions.refresh_frame(main_window)
 
         main_window.current_widget_parameters = main_window.parameters[self.face_id].copy()
 
@@ -535,10 +536,6 @@ class InputFaceCardButton(CardButton):
             cur_selected_target_face_button = main_window.cur_selected_target_face_button
 
             if QtWidgets.QApplication.keyboardModifiers() == QtCore.Qt.ShiftModifier:
-                # Step 1: Find the index of the last selected item before selecting the 'current_item_position' item. If this is None, then shift select shouldn't work
-                # Step 2: Find and store the details of all sequentially selected items behind 'second_last_item_position'
-                # Step 3: If there are trailing items, then deselect all checked items behind the last sequentially trailing item (This is to make sure all unsequentially selected items are deselected)
-                # Step 4: Now select all the items between second_last_item_position (or last trailed item, if there was trailing selected items) and the current_item_position, to complete the Shift Selection
                 current_item_position = self.get_item_position()
                 second_last_item_position = self.get_index_of_second_last_selected_item()
                 if second_last_item_position is not None:
@@ -585,18 +582,75 @@ class InputFaceCardButton(CardButton):
         
     def remove_input_face_from_list(self):
         main_window = self.main_window
-        i = self.get_item_position()
-        main_window.inputFacesList.takeItem(i)   
-        main_window.input_faces.pop(self.face_id)
-        for target_face_id in main_window.target_faces:
-            main_window.target_faces[target_face_id].remove_assigned_input_face(self.face_id)
+        buttons_to_remove_collector = []
 
-        common_widget_actions.refresh_frame(self.main_window)
-        self.deleteLater()
-        # If the input faces list is empty, show the placeholder text
-        if not main_window.input_faces:
-            main_window.placeholder_update_signal.emit(self.main_window.inputFacesList, False)
+        if self.isChecked():
+            # If 'self' (the button context menu was invoked on) is selected,
+            # gather all selected InputFaceCardButtons.
+            for i in range(main_window.inputFacesList.count()):
+                list_item = main_window.inputFacesList.item(i)
+                button = main_window.inputFacesList.itemWidget(list_item)
+                if isinstance(button, InputFaceCardButton) and button.isChecked():
+                    buttons_to_remove_collector.append(button)
+        else:
+            # If 'self' is not selected, only 'self' will be removed.
+            buttons_to_remove_collector.append(self)
 
+        if not buttons_to_remove_collector:
+            return # Should not happen due to the logic above
+
+        any_button_removed = False
+        # Iterate backwards through the QListWidget's items for safe removal
+        for i in range(main_window.inputFacesList.count() - 1, -1, -1):
+            list_item = main_window.inputFacesList.item(i)
+            button_in_list = main_window.inputFacesList.itemWidget(list_item)
+
+            if button_in_list in buttons_to_remove_collector:
+                # Remove from QListWidget
+                main_window.inputFacesList.takeItem(i)
+                
+                # Remove from main_window.input_faces dictionary
+                if button_in_list.face_id in main_window.input_faces:
+                    main_window.input_faces.pop(button_in_list.face_id)
+                
+                # Remove assignments from all target faces
+                for target_face in main_window.target_faces.values():
+                    target_face.remove_assigned_input_face(button_in_list.face_id)
+                
+                button_in_list.deleteLater()
+                any_button_removed = True
+        
+        if any_button_removed:
+            common_widget_actions.refresh_frame(main_window)
+            # If the input faces list is empty, show the placeholder text
+            if not main_window.input_faces:
+                main_window.placeholder_update_signal.emit(main_window.inputFacesList, False)
+
+
+    def clear_all_input_faces(self):
+        """Removes all input faces from the list and updates target face assignments."""
+        main_window = self.main_window
+        
+        # 1. Get a list of all input face IDs before clearing.
+        all_input_face_ids = list(main_window.input_faces.keys())
+
+        # 2. Remove assignments from all target faces.
+        for target_face in main_window.target_faces.values():
+            for face_id in all_input_face_ids:
+                target_face.remove_assigned_input_face(face_id)
+
+        # 3. Clear the backend dictionary and mark all button widgets for deletion.
+        for face_id in all_input_face_ids:
+            button_to_remove = main_window.input_faces.pop(face_id, None)
+            if button_to_remove:
+                button_to_remove.deleteLater()
+
+        # 4. Clear the list widget in the UI.
+        main_window.inputFacesList.clear()
+        
+        # 5. Refresh the main frame and update the placeholder.
+        common_widget_actions.refresh_frame(main_window)
+        main_window.placeholder_update_signal.emit(main_window.inputFacesList, False)
     def create_context_menu(self):
         # create context menu
         self.popMenu = QtWidgets.QMenu(self)
@@ -607,6 +661,13 @@ class InputFaceCardButton(CardButton):
         remove_action = QtGui.QAction('Remove from list', self)
         remove_action.triggered.connect(self.remove_input_face_from_list)
         self.popMenu.addAction(remove_action)
+        
+        # Add a separator and the "Clear All" action
+        self.popMenu.addSeparator()
+        clear_all_action = QtGui.QAction('Clear All', self)
+        clear_all_action.triggered.connect(self.clear_all_input_faces)
+        self.popMenu.addAction(clear_all_action)        
+        
     def on_context_menu(self, point):
         # show context menu
         self.popMenu.exec_(self.mapToGlobal(point))
@@ -779,6 +840,8 @@ class CreateEmbeddingDialog(QtWidgets.QDialog):
                 embedding_store=final_embedding_store,  # Passa l'intero embedding_store
                 embedding_id=str(uuid.uuid1().int)
             )
+            if self.main_window.embedding_sort_mode != "Off":
+                list_view_actions.reorder_embedding_list(self.main_window, self.main_window.embedding_sort_mode)
             self.accept()
 
 
